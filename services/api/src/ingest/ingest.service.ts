@@ -131,7 +131,18 @@ export class IngestService {
     // 7. wake the worker (best effort — the worker also sweeps periodically)
     if (accepted > 0) {
       this.redis.processing
-        .add(JOBS.PROCESS, {}, { jobId: PROCESS_JOB_ID, delay: 2000, removeOnComplete: true, removeOnFail: true })
+        .add(
+          JOBS.PROCESS,
+          { trigger: 'ingest' },
+          {
+            jobId: PROCESS_JOB_ID,
+            delay: 2000,
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 2000 },
+            removeOnComplete: true,
+            removeOnFail: true,
+          },
+        )
         .catch((e: Error) => this.log.warn({ err: e.message }, 'could not enqueue processing job'));
     }
 
