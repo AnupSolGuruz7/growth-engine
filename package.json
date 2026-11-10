@@ -1,0 +1,22 @@
+{
+  "name": "growthos",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": { "node": ">=20.19" },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel --filter=!@growthos/shared-types --filter=!@growthos/db",
+    "test": "turbo run test --concurrency=1",
+    "typecheck": "turbo run typecheck",
+    "infra:up": "docker compose up -d postgres redis",
+    "infra:down": "docker compose down",
+    "db:migrate": "pnpm --filter @growthos/db migrate",
+    "db:seed": "pnpm --filter @growthos/db seed",
+    "db:seed-demo": "pnpm --filter @growthos/db seed:demo"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "turbo": "2.11.10",
+    "typescript": "5.9.3"
+  }
+}
