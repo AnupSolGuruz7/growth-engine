@@ -22,8 +22,10 @@ beforeEach(() => {
   client = createClient();
 });
 
-afterEach(() => {
+afterEach(async () => {
   client._destroy();
+  // cancel happy-dom work still in flight (e.g. a followed link) so it cannot leak into the next test
+  await (window as unknown as { happyDOM: { abort(): Promise<void> } }).happyDOM.abort();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -139,6 +141,17 @@ describe('consent', () => {
     await client.flush();
     expect(events()[2]).toMatchObject({ consent_state: 'denied' });
     expect(events()[2]!.visitor_id).toBeUndefined();
+  });
+
+  it('keeps a stored visitor id across page loads while consent is pending (consent manager restores it)', async () => {
+    localStorage.setItem('gos_vid', 'returning-visitor');
+    init({ autoPageviews: false }); // consent defaults to pending on every page load
+    client.track('before_consent');
+    expect(localStorage.getItem('gos_vid')).toBe('returning-visitor');
+    client.setConsent('granted');
+    client.track('after_consent');
+    await client.flush();
+    expect(events().map((e) => e.visitor_id)).toEqual([undefined, 'returning-visitor']);
   });
 
   it('rotates the session after 30 minutes of inactivity', async () => {

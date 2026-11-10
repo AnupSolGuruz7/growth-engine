@@ -42,6 +42,44 @@ export interface SiteRef {
  */
 export async function insertEvents(db: Db, site: SiteRef, events: NormalizedEvent[]): Promise<number> {
   if (events.length === 0) return 0;
+  return db.transaction(async (m) => {
+    const inserted = await insertRows(m, site, events);
+    await stitchConsentedVisits(m, site, events);
+    return inserted;
+  });
+}
+
+/**
+ * When consent is granted part-way through a page visit, the events sent before it carry only the
+ * in-memory ephemeral id. Re-key those events (same ephemeral id = same page lifetime) to the
+ * consented visitor so the visit is one session, and mark both keys for re-sessionisation.
+ */
+async function stitchConsentedVisits(m: EntityManager, site: SiteRef, events: NormalizedEvent[]): Promise<void> {
+  const pairs = new Map<string, string>();
+  for (const e of events) {
+    if (e.consent_state === 'granted' && e.visitor_id && e.ephemeral_id) pairs.set(e.ephemeral_id, e.visitor_id);
+  }
+  if (pairs.size === 0) return;
+  await m.query(
+    `WITH s AS (
+       SELECT * FROM jsonb_to_recordset($2::jsonb) AS s(eph text, vid text)
+     ),
+     upd AS (
+       UPDATE events e SET visitor_key = 'v:' || s.vid
+       FROM s
+       WHERE e.site_id = $1 AND e.visitor_key = 'e:' || s.eph AND e.event_time > now() - interval '8 days'
+       RETURNING e.site_id, e.local_date, e.visitor_key AS new_key, 'e:' || s.eph AS old_key
+     )
+     INSERT INTO dirty_visitor_days (site_id, visitor_key, local_date)
+     SELECT site_id, new_key, local_date FROM upd
+     UNION
+     SELECT site_id, old_key, local_date FROM upd
+     ON CONFLICT (site_id, visitor_key, local_date) DO UPDATE SET marked_at = now()`,
+    [site.id, JSON.stringify([...pairs].map(([eph, vid]) => ({ eph, vid })))],
+  );
+}
+
+async function insertRows(db: EntityManager, site: SiteRef, events: NormalizedEvent[]): Promise<number> {
   const rows: { inserted: number }[] = await db.query(
     `
     WITH input AS (

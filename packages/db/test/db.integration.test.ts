@@ -49,9 +49,26 @@ describe('storage', () => {
       a: await ds.query(`SELECT site_id, date, visitors, sessions, pageviews, events, bounces FROM agg_daily_site ORDER BY date`),
     });
     const first = await snap();
-    expect(first.a.find((r: { date: string }) => r.date === '2026-11-10')).toMatchObject({ pageviews: 3, sessions: 2, visitors: 2 });
+    // e3 (cookieless, ephemeral eph1) was stitched to vis1 when a later consented event with eph1 arrived:
+    // 2 sessions (10:00 and 22:00 local, > 30 min apart) but one visitor.
+    expect(first.a.find((r: { date: string }) => r.date === '2026-11-10')).toMatchObject({ pageviews: 3, sessions: 2, visitors: 1 });
     await ds.query(`INSERT INTO dirty_visitor_days (site_id, visitor_key, local_date) SELECT DISTINCT site_id, visitor_key, local_date FROM events`);
     await processPending(ds);
     expect(await snap()).toEqual(first);
+  });
+
+  it('stitches a visit when consent is granted part-way through the page', async () => {
+    const cookieless = ev(20, '2026-11-12T15:00:00Z', { consent_state: 'pending', visitor_id: null, session_id: null, ephemeral_id: 'tab-9' });
+    await insertEvents(ds, site, [cookieless]);
+    await insertEvents(ds, site, [
+      ev(21, '2026-11-12T15:00:20Z', { event_name: 'cta', consent_state: 'granted', visitor_id: 'vis-9', ephemeral_id: 'tab-9' }),
+    ]);
+    await processPending(ds);
+    const keys = await ds.query(`SELECT DISTINCT visitor_key FROM events WHERE ephemeral_id = 'tab-9'`);
+    expect(keys).toEqual([{ visitor_key: 'v:vis-9' }]);
+    const sessions = await ds.query(
+      `SELECT visitor_key, pageviews, interactions, is_bounce FROM sessions WHERE local_date = '2026-11-12'`,
+    );
+    expect(sessions).toEqual([{ visitor_key: 'v:vis-9', pageviews: 1, interactions: 1, is_bounce: false }]);
   });
 });

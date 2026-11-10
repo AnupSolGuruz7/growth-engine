@@ -354,7 +354,9 @@ export function createClient(): GrowthOSClient & { _destroy(): void } {
         debug: !!c.debug,
       };
       consent = cfg.consent;
-      if (!granted()) forgetIds();
+      // 'pending' must not wipe ids: a consent manager usually restores 'granted' right after init.
+      // Pending simply neither reads nor writes them; only an explicit denial deletes them.
+      if (consent === 'denied') forgetIds();
       log('init', VERSION, cfg);
       listen(document, 'click', onClick, true);
       listen(document, 'auxclick', onClick, true);
@@ -379,7 +381,7 @@ export function createClient(): GrowthOSClient & { _destroy(): void } {
     setConsent: safe((state: ConsentState) => {
       if (state !== 'granted' && state !== 'denied' && state !== 'pending') return log('invalid consent', state);
       consent = state;
-      if (!granted()) forgetIds();
+      if (state === 'denied') forgetIds();
       log('consent', state);
     }),
 
