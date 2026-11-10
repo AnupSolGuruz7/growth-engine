@@ -1,0 +1,27 @@
+{
+  "name": "@growthos/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "migrate": "node dist/cli/migrate.js",
+    "seed": "node dist/cli/seed.js",
+    "seed:demo": "node dist/cli/seed-demo.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@growthos/shared-types": "workspace:*",
+    "dotenv": "16.6.1",
+    "pg": "8.23.1",
+    "reflect-metadata": "0.2.2",
+    "typeorm": "0.3.31"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1",
+    "vitest": "3.2.7"
+  }
+}
