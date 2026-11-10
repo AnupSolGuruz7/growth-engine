@@ -74,8 +74,7 @@ export type BatchRequest = Omit<BatchEnvelope, 'events'> & { events: IncomingEve
 
 export type RejectReason =
   | 'invalid_schema'
-  | 'event_time_out_of_range'
-  | 'duplicate_in_batch';
+  | 'event_time_out_of_range';
 
 export interface RejectedEvent {
   event_id: string | null;

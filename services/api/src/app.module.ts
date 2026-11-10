@@ -1,0 +1,60 @@
+import { type DynamicModule, Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { LoggerModule } from 'nestjs-pino';
+import { dataSourceOptions } from '@growthos/db';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { DevKeyGuard } from './common/dev-key.guard';
+import { RedisService } from './common/redis';
+import { APP_CONFIG, type AppConfig } from './config';
+import { HealthController } from './health/health.controller';
+import { IngestController } from './ingest/ingest.controller';
+import { IngestService } from './ingest/ingest.service';
+import { RateLimiter } from './ingest/rate-limiter';
+import { SiteCache } from './ingest/site-cache';
+import { MetricsController } from './metrics/metrics.controller';
+import { MetricsService } from './metrics/metrics.service';
+import { SdkController } from './sdk/sdk.controller';
+import { SitesController } from './sites/sites.controller';
+import { SitesService } from './sites/sites.service';
+
+@Module({})
+export class AppModule {
+  static forRoot(cfg: AppConfig): DynamicModule {
+    const shared = [
+      { provide: APP_CONFIG, useValue: cfg },
+      RedisService,
+      SiteCache,
+      SitesService,
+    ];
+    return {
+      module: AppModule,
+      global: true,
+      imports: [
+        LoggerModule.forRoot({
+          pinoHttp: {
+            level: cfg.logLevel,
+            transport: cfg.env === 'development' ? { target: 'pino-pretty', options: { singleLine: true } } : undefined,
+            // Never log IPs, cookies or the dev key (spec §13).
+            serializers: {
+              req: (r: { id: unknown; method: string; url: string }) => ({ id: r.id, method: r.method, url: r.url.split('?')[0] }),
+              res: (r: { statusCode: number }) => ({ statusCode: r.statusCode }),
+            },
+            autoLogging: { ignore: (req) => req.url === '/health' },
+          },
+        }),
+        TypeOrmModule.forRoot({ ...dataSourceOptions(cfg.databaseUrl), migrationsRun: cfg.migrationsRun }),
+        AnalyticsModule,
+      ],
+      controllers: [HealthController, IngestController, SitesController, MetricsController, SdkController],
+      providers: [
+        ...shared,
+        IngestService,
+        RateLimiter,
+        MetricsService,
+        { provide: APP_GUARD, useClass: DevKeyGuard },
+      ],
+      exports: shared,
+    };
+  }
+}
