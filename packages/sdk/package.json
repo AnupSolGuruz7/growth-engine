@@ -1,0 +1,26 @@
+{
+  "name": "@growthos/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/growthos.esm.js",
+  "module": "./dist/growthos.esm.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/types/index.d.ts", "import": "./dist/growthos.esm.js" },
+    "./iife": "./dist/growthos.iife.js"
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build && vite build --mode iife && tsc -p tsconfig.build.json && node scripts/size.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@growthos/shared-types": "workspace:*",
+    "happy-dom": "20.14.6",
+    "vite": "7.3.8",
+    "vitest": "3.2.7"
+  }
+}

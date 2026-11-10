@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blog · GrowthOS demo</title>
+    <!-- Script-tag install, exactly as the dashboard snippet shows it -->
+    <script src="%VITE_GROWTHOS_ENDPOINT%/sdk.js" data-site-id="%VITE_GROWTHOS_SITE_ID%" data-endpoint="%VITE_GROWTHOS_ENDPOINT%" data-debug="true" async></script>
+    <script type="module" src="/src/common.ts"></script>
+  </head>
+  <body>
+    <header>
+      <strong>Acme Demo</strong>
+      <a href="/">Home</a>
+      <a href="/pricing.html">Pricing</a>
+      <a href="/blog.html">Blog</a>
+      <a href="/app/">App (SPA)</a>
+    </header>
+    <main>
+      <h1>Blog</h1>
+      <article class="card"><h3>Launch week recap</h3><p>Short demo article. Scroll-depth is not tracked; only explicit events are.</p>
+        <button class="secondary" data-track="article_shared" data-props='{"slug":"launch-week","network":"linkedin"}'>Share on LinkedIn</button>
+      </article>
+      <article class="card"><h3>SEO basics</h3><p>Partner link (outbound): <a href="https://partner-blog.example.org/post?aff=123">partner-blog.example.org</a></p></article>
+    </main>
+    <div id="consent" hidden>
+      <p style="margin-top:0">We use privacy-friendly analytics. Allow a pseudonymous visitor id so we can count returning visits?</p>
+      <div class="row">
+        <button data-consent="granted">Allow</button>
+        <button class="secondary" data-consent="denied">Keep cookieless</button>
+      </div>
+    </div>
+  </body>
+</html>

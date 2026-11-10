@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>App (SPA) · GrowthOS demo</title>
+    <!-- Programmatic install: the SDK is imported from @growthos/sdk in /src/app.ts -->
+    <script type="module" src="/src/app.ts"></script>
+  </head>
+  <body>
+    <header>
+      <strong>Acme App</strong>
+      <a href="/app/" data-route>Dashboard</a>
+      <a href="/app/projects" data-route>Projects</a>
+      <a href="/app/settings" data-route>Settings</a>
+      <a href="/">← Marketing site</a>
+    </header>
+    <main id="view"></main>
+    <div id="consent" hidden>
+      <p style="margin-top:0">Allow a pseudonymous visitor id for product analytics?</p>
+      <div class="row">
+        <button data-consent="granted">Allow</button>
+        <button class="secondary" data-consent="denied">Keep cookieless</button>
+      </div>
+    </div>
+  </body>
+</html>

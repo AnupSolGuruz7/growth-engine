@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Home · GrowthOS demo</title>
+    <!-- Script-tag install, exactly as the dashboard snippet shows it -->
+    <script src="%VITE_GROWTHOS_ENDPOINT%/sdk.js" data-site-id="%VITE_GROWTHOS_SITE_ID%" data-endpoint="%VITE_GROWTHOS_ENDPOINT%" data-debug="true" async></script>
+    <script type="module" src="/src/common.ts"></script>
+  </head>
+  <body>
+    <header>
+      <strong>Acme Demo</strong>
+      <a href="/">Home</a>
+      <a href="/pricing.html">Pricing</a>
+      <a href="/blog.html">Blog</a>
+      <a href="/app/">App (SPA)</a>
+    </header>
+    <main>
+      <h1>Acme — a demo site for the GrowthOS SDK</h1>
+      <p>Every page view, custom event and outbound click on this site is sent to your local GrowthOS API. Open the browser console: the SDK runs with <code>data-debug="true"</code>.</p>
+      <div class="card">
+        <h3>Custom events</h3>
+        <div class="row">
+          <button data-track="cta_clicked" data-props='{"location":"hero"}'>Track cta_clicked</button>
+          <button class="secondary" data-track="newsletter_signup" data-props='{"list":"weekly"}'>Track newsletter_signup</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Outbound links</h3>
+        <p>These record <code>outbound_click</code> with host + path only: <a href="https://apps.apple.com/us/app/example/id123?ref=demo">App Store</a> · <a href="https://github.com/" target="_blank" rel="noopener">GitHub</a></p>
+      </div>
+      <div class="card">
+        <h3>Attribution</h3>
+        <p>Try a tagged URL: <a href="/?utm_source=newsletter&utm_medium=email&utm_campaign=demo_launch">/?utm_source=newsletter&amp;utm_medium=email&amp;utm_campaign=demo_launch</a></p>
+        <p>Non-utm query params are stripped by the SDK: <a href="/pricing.html?email=someone@example.com&token=secret">/pricing.html?email=…&amp;token=…</a></p>
+      </div>
+      <div class="card">
+        <h3>Privacy controls</h3>
+        <div class="row">
+          <button class="secondary" id="reset-consent">Reset consent choice</button>
+          <button class="secondary" id="optout">Opt out of tracking</button>
+        </div>
+      </div>
+    </main>
+    <div id="consent" hidden>
+      <p style="margin-top:0">We use privacy-friendly analytics. Allow a pseudonymous visitor id so we can count returning visits?</p>
+      <div class="row">
+        <button data-consent="granted">Allow</button>
+        <button class="secondary" data-consent="denied">Keep cookieless</button>
+      </div>
+    </div>
+  </body>
+</html>

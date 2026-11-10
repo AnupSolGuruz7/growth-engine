@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pricing · GrowthOS demo</title>
+    <!-- Script-tag install, exactly as the dashboard snippet shows it -->
+    <script src="%VITE_GROWTHOS_ENDPOINT%/sdk.js" data-site-id="%VITE_GROWTHOS_SITE_ID%" data-endpoint="%VITE_GROWTHOS_ENDPOINT%" data-debug="true" async></script>
+    <script type="module" src="/src/common.ts"></script>
+  </head>
+  <body>
+    <header>
+      <strong>Acme Demo</strong>
+      <a href="/">Home</a>
+      <a href="/pricing.html">Pricing</a>
+      <a href="/blog.html">Blog</a>
+      <a href="/app/">App (SPA)</a>
+    </header>
+    <main>
+      <h1>Pricing</h1>
+      <div class="card"><h3>Starter — $9/mo</h3><button data-track="signup_click" data-props='{"plan":"starter"}'>Start trial</button></div>
+      <div class="card"><h3>Pro — $29/mo</h3><button data-track="signup_click" data-props='{"plan":"pro"}'>Start trial</button></div>
+      <div class="card">
+        <h3>Contact sales</h3>
+        <p>The SDK never reads form values; only the event below is sent.</p>
+        <form id="enquiry" class="row" onsubmit="return false">
+          <input name="email" type="email" placeholder="you@company.com" />
+          <button type="submit" data-track="enquiry_submitted" data-props='{"form":"sales"}'>Send enquiry</button>
+        </form>
+      </div>
+    </main>
+    <div id="consent" hidden>
+      <p style="margin-top:0">We use privacy-friendly analytics. Allow a pseudonymous visitor id so we can count returning visits?</p>
+      <div class="row">
+        <button data-consent="granted">Allow</button>
+        <button class="secondary" data-consent="denied">Keep cookieless</button>
+      </div>
+    </div>
+  </body>
+</html>
