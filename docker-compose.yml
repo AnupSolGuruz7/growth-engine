@@ -1,5 +1,9 @@
 name: growthos
 
+# Local infra only:   docker compose up -d postgres redis        (= pnpm infra:up)
+# Full stack:         docker compose --profile app up -d --build
+# Variables (DEV_KEY, PUBLIC_API_URL, ...) are read from the root .env.
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -27,6 +31,57 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  api:
+    profiles: ["app"]
+    build: { context: ., target: api }
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://growthos:growthos@postgres:5432/growthos
+      REDIS_URL: redis://redis:6379/0
+      DEV_KEY: ${DEV_KEY:?set DEV_KEY in .env}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      RATE_LIMIT_SITE_PER_MIN: ${RATE_LIMIT_SITE_PER_MIN:-600}
+      RATE_LIMIT_IP_PER_MIN: ${RATE_LIMIT_IP_PER_MIN:-120}
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      # 127.0.0.1, not localhost: alpine resolves localhost to ::1 and the API listens on IPv4
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+  worker:
+    profiles: ["app"]
+    build: { context: ., target: worker }
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://growthos:growthos@postgres:5432/growthos
+      REDIS_URL: redis://redis:6379/0
+      SESSION_TIMEOUT_MIN: ${SESSION_TIMEOUT_MIN:-30}
+      SWEEP_INTERVAL_SEC: ${SWEEP_INTERVAL_SEC:-30}
+    depends_on:
+      api: { condition: service_healthy }   # api runs the migrations
+
+  dashboard:
+    profiles: ["app"]
+    build:
+      context: .
+      target: dashboard
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+        VITE_DEV_KEY: ${DEV_KEY:?set DEV_KEY in .env}
+    ports:
+      - "5180:80"
+    depends_on:
+      - api
 
 volumes:
   pg16data:

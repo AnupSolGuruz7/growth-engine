@@ -9,6 +9,8 @@
     "test": "turbo run test --concurrency=1",
     "typecheck": "turbo run typecheck",
     "infra:up": "docker compose up -d postgres redis",
+    "stack:up": "docker compose --profile app up -d --build",
+    "stack:down": "docker compose --profile app down",
     "infra:down": "docker compose down",
     "db:migrate": "pnpm --filter @growthos/db migrate",
     "db:seed": "pnpm --filter @growthos/db seed",
