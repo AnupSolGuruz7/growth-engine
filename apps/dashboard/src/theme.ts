@@ -50,7 +50,7 @@ export const antdTheme: ThemeConfig = {
     borderRadiusLG: 14,
     borderRadiusSM: 8,
     borderRadiusXS: 6,
-    fontFamily: '"Helvetica Neue", Roboto, Arial, "Segoe UI", system-ui, sans-serif',
+    fontFamily: 'Poppins, "Segoe UI", Roboto, Arial, system-ui, sans-serif',
   },
   components: {
     Layout: { headerBg: brand.header, siderBg: brand.navy, bodyBg: brand.canvas, triggerBg: brand.navyDark },
