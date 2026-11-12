@@ -4,7 +4,7 @@ import { Worker, type Job } from 'bullmq';
 import IORedis, { type Redis } from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
 import {
-  auditScore, crawlSite, isIndexable, runChecks, runPageSpeed, scoreFindings,
+  auditScore, crawlSite, isContentChecked, isIndexable, runChecks, runPageSpeed, scoreFindings,
   type CrawlResult, type PageSpeedResult, type ScoredFinding,
 } from '@growthos/seo';
 import { SEO_CATEGORIES, SEO_JOB, SEO_QUEUE, SEO_SEVERITIES, type SeoAuditSummary } from '@growthos/shared-types';
@@ -120,7 +120,7 @@ export class SeoAuditWorker implements OnApplicationBootstrap, OnApplicationShut
     if (!this.cfg.pagespeedEnabled) return { psi: [], skipped: 'disabled' };
     if (isPrivateHost(crawl.host)) return { psi: [], skipped: 'private_host' };
     const candidates = crawl.pages
-      .filter(isIndexable)
+      .filter(isContentChecked)
       .sort((x, y) => (traffic.get(pathKey(y.url)) ?? 0) - (traffic.get(pathKey(x.url)) ?? 0))
       .slice(0, this.cfg.pagespeedPages)
       .map((p) => p.url);

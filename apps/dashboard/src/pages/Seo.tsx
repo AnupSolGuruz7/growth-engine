@@ -5,6 +5,7 @@ import {
 } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { SeoAuditDto, SeoFindingDto, SeoPageRow, SeoSeverity } from '@growthos/shared-types';
 import { api, ApiError } from '../api';
 import { DraftFix, canDraft } from '../components/seo/DraftFix';
@@ -136,7 +137,13 @@ function FindingDrawer({ finding, onClose }: { finding: SeoFindingDto | null; on
             <Typography.Paragraph copyable={{ text: finding.suggested_fix }} className="fix">
               {finding.suggested_fix}
             </Typography.Paragraph>
-            {canDraft(finding) && <DraftFix key={finding.id} finding={finding} />}
+            {canDraft(finding) ? (
+              <DraftFix key={finding.id} finding={finding} />
+            ) : (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                AI drafts are available for title, meta description, heading, image alt text, structured data and thin-content issues.
+              </Typography.Text>
+            )}
           </div>
           {finding.limits && <Alert type="info" showIcon message={finding.limits} />}
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -381,6 +388,17 @@ export function SeoPage() {
         )
       ) : (
         <>
+          <Alert
+            style={{ marginBottom: 16 }}
+            type="info"
+            showIcon
+            message={
+              <>
+                Open a finding for its fix — title, description, heading and alt-text issues have a <b>Draft fix with AI</b> button. For
+                prioritised SEO and marketing ideas based on this audit plus your traffic, see <Link to="/growth">Growth suggestions</Link>.
+              </>
+            }
+          />
           <ScoreCard audit={audit} />
           <Card size="small">
             <Tabs

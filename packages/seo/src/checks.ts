@@ -52,6 +52,40 @@ function sameUrl(a: string, b: string): boolean {
   return n(a) === n(b);
 }
 
+const bareHost = (h: string) => h.toLowerCase().replace(/^www\./, '');
+
+/**
+ * Placeholder / test pages: a whole path segment like /test or /staging-2, or placeholder text in
+ * the title or H1. Ordinary words inside a slug ("stress-test-your-cash-flow") do not count.
+ */
+export function isPlaceholderPage(path: string, title: string | null, h1: string[]): boolean {
+  const segment = /(^|\/)(test|tests|testing|test-page|staging|dev|demo-page|sample-page|hello-world|untitled)(-\d+)?(\/|$)/i;
+  const text = /\b(lorem ipsum|sample page|hello world|test page|untitled( page)?)\b/i;
+  return segment.test(path) || text.test(`${title ?? ''} ${h1.join(' ')}`) || /^\s*test\s*$/i.test(title ?? '');
+}
+
+/**
+ * The canonical points to the same path on a different host: this host mirrors that one
+ * (a staging copy, an alias domain). Search engines index the other host, but the content —
+ * and so every on-page check — is the same.
+ */
+export function isMirrorCanonical(p: CrawledPage): boolean {
+  if (!p.html?.canonical) return false;
+  try {
+    const c = new URL(p.html.canonical);
+    const u = new URL(p.url);
+    const path = (x: URL) => (x.pathname.replace(/\/+$/, '') || '/') + x.search;
+    return bareHost(c.hostname) !== bareHost(u.hostname) && path(c) === path(u);
+  } catch {
+    return false;
+  }
+}
+
+/** Pages whose content is checked: live HTML, not noindex or robots-blocked, canonical to itself or to its mirror. */
+export const isContentChecked = (p: CrawledPage) =>
+  p.status === 200 && !!p.html && !p.finalUrl && !isNoindex(p) && !p.blockedByRobots &&
+  (!p.html.canonical || sameUrl(p.html.canonical, p.url) || isMirrorCanonical(p));
+
 const isPaginated = (p: CrawledPage) =>
   !!p.html?.paginationRel.prev || /[?&](page|p)=\d+/.test(p.url) || /\/page\/\d+\/?$/.test(new URL(p.url).pathname);
 
@@ -62,9 +96,32 @@ export function runChecks(crawl: CrawlResult, psi: PageSpeedResult[] = []): Find
   const byUrl = new Map(crawl.pages.map((p) => [p.url, p]));
   const home = crawl.pages[0];
   const htmlPages = crawl.pages.filter((p) => p.status === 200 && p.html && !p.finalUrl);
-  const indexable = htmlPages.filter(isIndexable);
+  // pages whose content is checked (includes mirror pages: same content as the canonical host)
+  const indexable = htmlPages.filter(isContentChecked);
 
   // ---------------------------------------------------------------- site level
+  const mirrors = htmlPages.filter(isMirrorCanonical);
+  const siteIsMirror = mirrors.length >= 3 && mirrors.length >= htmlPages.length * 0.5;
+  if (siteIsMirror) {
+    const target = new URL(mirrors[0]!.html!.canonical!);
+    add({
+      check_id: 'canonical_other_domain', category: 'technical', severity: 'medium',
+      title: `This host is a copy of ${target.hostname} (canonical tags point there)`,
+      url: home?.url ?? crawl.startUrl,
+      evidence: {
+        canonical_host: target.hostname,
+        pages_pointing_there: mirrors.length,
+        pages_checked: htmlPages.length,
+        examples: mirrors.slice(0, 5).map((p) => ({ page: p.url, canonical: p.html!.canonical })),
+      },
+      explanation: `${mirrors.length} of ${htmlPages.length} pages declare the same page on ${target.hostname} as the canonical version, so search engines will index ${target.hostname}, not ${crawl.host}. That is correct for a staging or mirror copy, and wrong if ${crawl.host} is meant to rank.`,
+      suggested_fix: `If ${crawl.host} is a staging copy: keep the canonicals, block indexing (noindex or password protection) and audit ${target.hostname} for search results. If ${crawl.host} should rank: make every canonical self-referencing.`,
+      confidence: 0.7, effort: 1, group_key: 'site',
+      limits: 'Content checks below still run on these pages because they serve the same content as the canonical host.',
+    });
+  }
+
+  // ---------------------------------------------------------------- site level (robots, sitemap, https)
   if (!crawl.robots.found) {
     add({
       check_id: 'robots_missing', category: 'technical', severity: 'low', title: 'No robots.txt',
@@ -220,7 +277,15 @@ export function runChecks(crawl: CrawlResult, psi: PageSpeedResult[] = []): Find
         confidence: 0.9, effort: 1,
       });
     }
-    if (h.canonical && !sameUrl(h.canonical, p.url)) {
+    // site-wide mirror canonicals are reported once above, not per page
+    if (h.canonical && !sameUrl(h.canonical, p.url) && !(siteIsMirror && isMirrorCanonical(p))) {
+      const sameHost = (() => {
+        try {
+          return bareHost(new URL(h.canonical).hostname) === bareHost(new URL(p.url).hostname);
+        } catch {
+          return false;
+        }
+      })();
       const target = byUrl.get(h.canonical) ?? byUrl.get(h.canonical.replace(/\/$/, '')) ?? byUrl.get(h.canonical + '/');
       if (target && (target.status !== 200 || target.finalUrl)) {
         add({
@@ -230,7 +295,7 @@ export function runChecks(crawl: CrawlResult, psi: PageSpeedResult[] = []): Find
           suggested_fix: `Point the canonical at the final live URL${target.finalUrl ? ` (${target.finalUrl})` : ''}.`,
           confidence: 0.9, effort: 1,
         });
-      } else if (isPaginated(p)) {
+      } else if (isPaginated(p) && sameHost && !isMirrorCanonical(p)) {
         add({
           check_id: 'paginated_canonical', category: 'technical', severity: 'medium', title: 'Paginated page canonicalises to another page',
           url: p.url, evidence: { canonical: h.canonical },
@@ -248,7 +313,7 @@ export function runChecks(crawl: CrawlResult, psi: PageSpeedResult[] = []): Find
         });
       }
     }
-    if (!isIndexable(p)) continue;
+    if (!isContentChecked(p)) continue;
 
     if (h.jsRendered) {
       add({
@@ -391,7 +456,7 @@ export function runChecks(crawl: CrawlResult, psi: PageSpeedResult[] = []): Find
         confidence: 0.5, effort: 2, limits: 'Word count is a rough proxy; some pages (contact, tools) are short by design.',
       });
     }
-    if (/\b(test|staging|lorem ipsum|sample page|hello world|untitled)\b/i.test(`${p.path} ${h.title ?? ''} ${h.h1.join(' ')}`)) {
+    if (isPlaceholderPage(p.path, h.title, h.h1)) {
       add({
         check_id: 'test_page', category: 'on-page', severity: 'medium', title: 'Looks like a test or placeholder page',
         url: p.url, evidence: { title: h.title, h1: h.h1 },
