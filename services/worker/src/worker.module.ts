@@ -4,6 +4,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { dataSourceOptions } from '@growthos/db';
 import { WORKER_CONFIG, type WorkerConfig } from './config';
 import { ProcessingWorker } from './processing.worker';
+import { SeoAuditWorker } from './seo-audit.worker';
 
 @Module({})
 export class WorkerModule {
@@ -19,7 +20,7 @@ export class WorkerModule {
         }),
         TypeOrmModule.forRoot(dataSourceOptions(cfg.databaseUrl)),
       ],
-      providers: [{ provide: WORKER_CONFIG, useValue: cfg }, ProcessingWorker],
+      providers: [{ provide: WORKER_CONFIG, useValue: cfg }, ProcessingWorker, SeoAuditWorker],
     };
   }
 }

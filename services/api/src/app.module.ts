@@ -15,6 +15,8 @@ import { SiteCache } from './ingest/site-cache';
 import { MetricsController } from './metrics/metrics.controller';
 import { MetricsService } from './metrics/metrics.service';
 import { SdkController } from './sdk/sdk.controller';
+import { SeoController } from './seo/seo.controller';
+import { SeoService } from './seo/seo.service';
 import { SitesController } from './sites/sites.controller';
 import { SitesService } from './sites/sites.service';
 
@@ -46,10 +48,11 @@ export class AppModule {
         TypeOrmModule.forRoot({ ...dataSourceOptions(cfg.databaseUrl), migrationsRun: cfg.migrationsRun }),
         AnalyticsModule,
       ],
-      controllers: [HealthController, IngestController, SitesController, MetricsController, SdkController],
+      controllers: [HealthController, IngestController, SitesController, MetricsController, SdkController, SeoController],
       providers: [
         ...shared,
         IngestService,
+        SeoService,
         RateLimiter,
         MetricsService,
         { provide: APP_GUARD, useClass: DevKeyGuard },

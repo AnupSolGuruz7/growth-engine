@@ -1,0 +1,22 @@
+{
+  "name": "@growthos/seo",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@growthos/shared-types": "workspace:*",
+    "cheerio": "1.2.0",
+    "robots-parser": "3.0.1",
+    "undici": "7.30.1"
+  },
+  "devDependencies": {
+    "vitest": "3.2.7"
+  }
+}

@@ -23,7 +23,8 @@
     "pino-http": "10.5.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
-    "typeorm": "0.3.31"
+    "typeorm": "0.3.31",
+    "@growthos/seo": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/cli": "11.0.24",
