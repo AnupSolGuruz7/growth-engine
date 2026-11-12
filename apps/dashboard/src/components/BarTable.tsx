@@ -33,7 +33,7 @@ export function BarTable<T extends object>({ rows, rowKey, label, value, extra =
         return (
           <Tooltip title={`${fmtNumber(v)} ${value.title.toLowerCase()} · ${total ? ((v / total) * 100).toFixed(1) : 0}%`} placement="topLeft">
             <div className="bar-cell">
-              <div className="bar-fill" style={{ width: `${(v / max) * 100}%`, background: viz.barTrack, borderLeft: `3px solid ${viz.series1}` }} />
+              <div className="bar-fill" style={{ width: `${(v / max) * 100}%`, background: viz.barTrack, boxShadow: `inset 3px 0 0 ${viz.series1}` }} />
               <span className="bar-label">{label.render(r)}</span>
             </div>
           </Tooltip>

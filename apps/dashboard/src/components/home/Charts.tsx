@@ -84,7 +84,8 @@ export function DeviceDonut({ rows, loading }: { rows: { device_category: string
               nameKey="device_category"
               innerRadius="58%"
               outerRadius="92%"
-              paddingAngle={2}
+              paddingAngle={3}
+              cornerRadius={6}
               stroke={viz.surface}
               strokeWidth={2}
               isAnimationActive={false}
