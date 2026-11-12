@@ -27,7 +27,7 @@ export async function seedDemoSite(db: Db, timezone = 'UTC'): Promise<{ id: stri
   const org = await seedDevOrganization(db);
   const rows: { id: string; organization_id: string; timezone: string }[] = await db.query(
     `INSERT INTO sites (organization_id, name, domain, public_id, timezone)
-     VALUES ($1, 'Demo site', 'localhost', $2, $3)
+     VALUES ($1, 'Demo site', 'localhost:5174', $2, $3)
      ON CONFLICT (public_id) DO UPDATE SET status = 'active'
      RETURNING id, organization_id, timezone`,
     [org.id, DEMO_SITE_PUBLIC_ID, timezone],

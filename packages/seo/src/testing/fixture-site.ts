@@ -38,7 +38,7 @@ export function fixtureRoutes(base: string): Record<string, { status: number; he
         h1: ['Acme Analytics'],
         canonical: `${base}/`,
         head: '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Acme"}</script>',
-        body: `<p>${LONG}</p><a href="/old-pricing">Old pricing</a> <a href="/missing">Missing page</a> <a href="/private/area">Private</a> <a href="https://external.example.org/x">External</a> <img src="/hero.png">`,
+        body: `<p>${LONG}</p><a href="/app">App</a> <a href="/old-pricing">Old pricing</a> <a href="/missing">Missing page</a> <a href="/private/area">Private</a> <a href="https://external.example.org/x">External</a> <img src="/hero.png">`,
       }),
     },
     '/pricing': { status: 200, body: page({ title: 'Pricing', desc: DESC, h1: ['Pricing'], canonical: `${base}/pricing`, body: `<p>${LONG}</p><a href="/missing">broken again</a>` }) },
@@ -67,6 +67,8 @@ export function fixtureRoutes(base: string): Record<string, { status: number; he
     '/old-pricing': { status: 301, headers: { location: '/older-pricing' } },
     '/older-pricing': { status: 301, headers: { location: '/oldest-pricing' } },
     '/oldest-pricing': { status: 301, headers: { location: '/pricing' } },
+    // a client-rendered SPA route: empty mount point + module script
+    '/app': { status: 200, body: page({ title: 'Acme app dashboard for your analytics', desc: DESC, canonical: `${base}/app`, body: '<div id="root"></div><script type="module" src="/assets/app.js"></script>' }) },
     '/gone': { status: 410, body: 'gone' },
     '/private/area': { status: 200, body: page({ title: 'Private area should never be fetched', h1: ['Private'] }) },
   };
@@ -93,6 +95,7 @@ export const EXPECTED_FINDINGS: [string, string][] = [
   ['title_duplicate', '/'],
   ['orphan_page', '/orphan'],
   ['thin_content', '/orphan'],
+  ['js_rendered_content', '/app'],
 ];
 
 export async function startFixtureSite(): Promise<{ url: string; requests: string[]; close: () => Promise<void> }> {

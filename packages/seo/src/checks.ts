@@ -100,7 +100,8 @@ export function runChecks(crawl: CrawlResult, psi: PageSpeedResult[] = []): Find
       confidence: 0.9, effort: 2, group_key: 'site',
     });
   }
-  if (crawl.startUrl.startsWith('http:')) {
+  const localHost = crawl.host === 'localhost' || /^[\d.]+$/.test(crawl.host) || crawl.host.includes(':');
+  if (crawl.startUrl.startsWith('http:') && !localHost) {
     add(crawl.httpsAvailable
       ? {
           check_id: 'http_not_redirected', category: 'technical', severity: 'medium', title: 'Site is served over HTTP without redirecting to HTTPS',
@@ -248,6 +249,17 @@ export function runChecks(crawl: CrawlResult, psi: PageSpeedResult[] = []): Find
       }
     }
     if (!isIndexable(p)) continue;
+
+    if (h.jsRendered) {
+      add({
+        check_id: 'js_rendered_content', category: 'technical', severity: 'medium', title: 'Content is rendered by JavaScript',
+        url: p.url, evidence: { static_word_count: h.wordCount },
+        explanation: 'The HTML sent by the server is an empty app shell; the visible content only appears after JavaScript runs. Search engines render JavaScript later and less reliably, and other crawlers (social previews, AI assistants) often never see the content.',
+        suggested_fix: 'Server-side render or pre-render this route (e.g. Next.js/Nuxt SSR or static generation, or a prerender service) so the HTML already contains the title, headings and text.',
+        confidence: 0.7, effort: 3,
+        limits: 'Detected from the static HTML (empty mount element + scripts). Content checks on this page are marked low-confidence.',
+      });
+    }
 
     if (!h.canonical) {
       add({
@@ -499,8 +511,25 @@ export function runChecks(crawl: CrawlResult, psi: PageSpeedResult[] = []): Find
       });
     }
   }
-  return f;
+  // Content checks on JavaScript-rendered pages only saw the empty shell: keep them, but say so.
+  const jsPages = new Set(htmlPages.filter((p) => p.html!.jsRendered).map((p) => p.url));
+  return f.map((x) =>
+    jsPages.has(x.url) && JS_SENSITIVE.has(x.check_id)
+      ? {
+          ...x,
+          confidence: Math.min(x.confidence, 0.3),
+          limits: 'This page renders its content with JavaScript; only the static HTML was checked, so this may not match what visitors see.',
+        }
+      : x,
+  );
 }
+
+/** Checks whose result depends on page content that a JavaScript app may only add after load. */
+const JS_SENSITIVE = new Set([
+  'h1_missing', 'h1_multiple', 'heading_skip', 'bold_as_heading', 'thin_content', 'images_missing_alt',
+  'structured_data_missing', 'title_missing', 'title_length', 'title_duplicate', 'meta_description_missing',
+  'meta_description_length', 'meta_description_duplicate',
+]);
 
 function sitemapListed(crawl: CrawlResult, p: CrawledPage): boolean {
   return p.inSitemap || crawl.sitemap.urls.includes(p.url);

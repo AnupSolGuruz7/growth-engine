@@ -1,4 +1,5 @@
 import type {
+  CreateAuditInput,
   CreateSiteInput,
   DevicesResponse,
   EventsResponse,
@@ -6,6 +7,11 @@ import type {
   OverviewResponse,
   PagesResponse,
   RealtimeResponse,
+  SeoAuditDto,
+  SeoComparisonDto,
+  SeoFindingDto,
+  SeoPageDetail,
+  SeoPageRow,
   SiteDetailDto,
   SiteDto,
   SourcesResponse,
@@ -75,6 +81,14 @@ export const api = {
     json<EventsResponse>('/v1/analytics/events' + qs({ ...q, compare: undefined, event_name: eventName })),
   devices: (q: RangeQuery) => json<DevicesResponse>('/v1/analytics/devices' + qs({ ...q, compare: undefined })),
   realtime: (siteId: string) => json<RealtimeResponse>('/v1/analytics/realtime' + qs({ site_id: siteId })),
+
+  seoAudits: (siteId: string) => json<SeoAuditDto[]>('/v1/seo/audits' + qs({ site_id: siteId })),
+  seoAudit: (id: string) => json<SeoAuditDto>(`/v1/seo/audits/${id}`),
+  startSeoAudit: (input: CreateAuditInput) => json<SeoAuditDto>('/v1/seo/audits', { method: 'POST', body: JSON.stringify(input) }),
+  seoFindings: (id: string) => json<SeoFindingDto[]>(`/v1/seo/audits/${id}/findings`),
+  seoPages: (id: string) => json<SeoPageRow[]>(`/v1/seo/audits/${id}/pages`),
+  seoPage: (id: string, url: string) => json<SeoPageDetail>(`/v1/seo/audits/${id}/page` + qs({ url })),
+  seoCompare: (id: string, prevId: string) => json<SeoComparisonDto>(`/v1/seo/audits/${id}/compare/${prevId}`),
 
   /** Fetches the CSV with the dev key header and hands it to the browser as a file. */
   async downloadCsv(report: ExportReport, q: RangeQuery): Promise<void> {

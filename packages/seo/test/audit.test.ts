@@ -73,6 +73,19 @@ describe('checks', () => {
     const blogAlt = findings.find((f) => f.check_id === 'images_missing_alt' && path(f.url) === '/blog')!;
     expect((blogAlt.evidence.images as string[]).map(path)).toEqual(['/a.png']);
     expect(findings.some((f) => f.check_id === 'structured_data_missing')).toBe(false);
+    // http on localhost / an IP is development, not a missing-HTTPS problem
+    expect(findings.some((f) => f.check_id === 'no_https' || f.check_id === 'http_not_redirected')).toBe(false);
+  });
+
+  it('flags client-rendered pages and marks their content checks low-confidence', () => {
+    const onApp = findings.filter((f) => path(f.url) === '/app');
+    expect(onApp.find((f) => f.check_id === 'js_rendered_content')).toMatchObject({ severity: 'medium' });
+    const h1 = onApp.find((f) => f.check_id === 'h1_missing')!;
+    expect(h1.confidence).toBeLessThanOrEqual(0.3);
+    expect(h1.limits).toMatch(/JavaScript/);
+    // ordinary pages are not affected
+    expect(findings.filter((f) => f.check_id === 'js_rendered_content').map((f) => path(f.url))).toEqual(['/app']);
+    expect(findings.find((f) => f.check_id === 'h1_missing' && path(f.url) === '/about')!.confidence).toBeGreaterThan(0.3);
   });
 
   it('gives every finding evidence and a concrete fix', () => {

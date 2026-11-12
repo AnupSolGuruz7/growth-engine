@@ -5,6 +5,7 @@ import {
   GlobalOutlined,
   LaptopOutlined,
   PlusOutlined,
+  SearchOutlined,
   SettingOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
@@ -24,6 +25,7 @@ const NAV = [
   { key: '/sources', icon: <GlobalOutlined />, label: 'Sources' },
   { key: '/events', icon: <AppstoreOutlined />, label: 'Events' },
   { key: '/devices', icon: <LaptopOutlined />, label: 'Devices' },
+  { key: '/seo', icon: <SearchOutlined />, label: 'SEO audit' },
   { key: '/sites', icon: <SettingOutlined />, label: 'Sites' },
 ];
 

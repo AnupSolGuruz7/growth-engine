@@ -19,6 +19,8 @@ export interface ParsedHtml {
   renderBlocking: { scripts: string[]; stylesheets: number };
   /** Short paragraphs that consist only of bold text: subheads written as bold instead of <h2>. */
   boldPseudoHeadings: string[];
+  /** The static HTML is an app shell: an empty mount point plus scripts, content comes from JavaScript. */
+  jsRendered: boolean;
   paginationRel: { next: string | null; prev: string | null };
 }
 
@@ -100,6 +102,11 @@ export function parseHtml(html: string, pageUrl: string): ParsedHtml {
   const body = $('body').clone();
   body.find('script, style, noscript, template, svg, iframe').remove();
   const text = clean(body.text()) ?? '';
+  const words = text ? text.split(' ').filter((w) => /\p{L}|\p{N}/u.test(w)).length : 0;
+  const emptyMount = $('#root, #app, #__next, #__nuxt, #view, #main, [data-reactroot]')
+    .toArray()
+    .some((el) => !(clean($(el).text()) ?? ''));
+  const jsRendered = emptyMount && $('script[src]').length > 0 && words < 120;
 
   return {
     title: clean($('head > title').first().text() || $('title').first().text()),
@@ -113,7 +120,7 @@ export function parseHtml(html: string, pageUrl: string): ParsedHtml {
     hasViewport: $('meta[name="viewport" i]').length > 0,
     h1: headings.filter((h) => h.level === 1).map((h) => h.text),
     headings,
-    wordCount: text ? text.split(' ').filter((w) => /\p{L}|\p{N}/u.test(w)).length : 0,
+    wordCount: words,
     textExcerpt: text.slice(0, 4000),
     links,
     images: imgs.length,
@@ -121,6 +128,7 @@ export function parseHtml(html: string, pageUrl: string): ParsedHtml {
     structuredData,
     renderBlocking: { scripts: renderBlockingScripts, stylesheets: renderBlockingCss },
     boldPseudoHeadings,
+    jsRendered,
     paginationRel: {
       next: (() => { const h = $('link[rel="next" i]').attr('href'); return h ? abs(h, base) : null; })(),
       prev: (() => { const h = $('link[rel="prev" i]').attr('href'); return h ? abs(h, base) : null; })(),

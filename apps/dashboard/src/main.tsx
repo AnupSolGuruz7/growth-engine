@@ -9,6 +9,7 @@ import { EventsPage } from './pages/Events';
 import { OverviewPage } from './pages/Overview';
 import { PagesPage } from './pages/Pages';
 import { RealtimePage } from './pages/Realtime';
+import { SeoPage } from './pages/Seo';
 import { SitesPage } from './pages/Sites';
 import { SourcesPage } from './pages/Sources';
 import { antdTheme } from './theme';
@@ -32,6 +33,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="sources" element={<SourcesPage />} />
                 <Route path="events" element={<EventsPage />} />
                 <Route path="devices" element={<DevicesPage />} />
+                <Route path="seo" element={<SeoPage />} />
                 <Route path="sites" element={<SitesPage />} />
                 <Route path="*" element={<OverviewPage />} />
               </Route>
