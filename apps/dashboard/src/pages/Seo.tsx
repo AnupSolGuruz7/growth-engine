@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import type { SeoAuditDto, SeoFindingDto, SeoPageRow, SeoSeverity } from '@growthos/shared-types';
 import { api, ApiError } from '../api';
+import { DraftFix, canDraft } from '../components/seo/DraftFix';
 import { CATEGORY_LABEL, Evidence, SerpPreview, SeverityTag, scoreBand, shortUrl } from '../components/seo/SeoBits';
 import { fmtNumber, timeAgo } from '../dates';
 import { useCurrentSite } from '../hooks';
@@ -135,6 +136,7 @@ function FindingDrawer({ finding, onClose }: { finding: SeoFindingDto | null; on
             <Typography.Paragraph copyable={{ text: finding.suggested_fix }} className="fix">
               {finding.suggested_fix}
             </Typography.Paragraph>
+            {canDraft(finding) && <DraftFix key={finding.id} finding={finding} />}
           </div>
           {finding.limits && <Alert type="info" showIcon message={finding.limits} />}
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>

@@ -45,6 +45,10 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-false}
       RATE_LIMIT_SITE_PER_MIN: ${RATE_LIMIT_SITE_PER_MIN:-600}
       RATE_LIMIT_IP_PER_MIN: ${RATE_LIMIT_IP_PER_MIN:-120}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-opus-5-5}
+      AI_MONTHLY_BUDGET_USD: ${AI_MONTHLY_BUDGET_USD:-20}
+      AI_ASK_DAILY_LIMIT: ${AI_ASK_DAILY_LIMIT:-50}
     ports:
       - "4000:4000"
     depends_on:
@@ -67,6 +71,12 @@ services:
       REDIS_URL: redis://redis:6379/0
       SESSION_TIMEOUT_MIN: ${SESSION_TIMEOUT_MIN:-30}
       SWEEP_INTERVAL_SEC: ${SWEEP_INTERVAL_SEC:-30}
+      SEO_CONCURRENCY: ${SEO_CONCURRENCY:-2}
+      SEO_CRAWL_DELAY_MS: ${SEO_CRAWL_DELAY_MS:-650}
+      # containers cannot reach your localhost sites anyway; keep private hosts blocked here
+      SEO_ALLOW_PRIVATE_HOSTS: "false"
+      PAGESPEED_ENABLED: ${PAGESPEED_ENABLED:-true}
+      PAGESPEED_API_KEY: ${PAGESPEED_API_KEY:-}
     depends_on:
       api: { condition: service_healthy }   # api runs the migrations
 

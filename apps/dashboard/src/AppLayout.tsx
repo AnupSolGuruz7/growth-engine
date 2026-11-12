@@ -1,5 +1,7 @@
 import {
   AppstoreOutlined,
+  BulbOutlined,
+  CommentOutlined,
   BarChartOutlined,
   FileTextOutlined,
   GlobalOutlined,
@@ -26,6 +28,8 @@ const NAV = [
   { key: '/events', icon: <AppstoreOutlined />, label: 'Events' },
   { key: '/devices', icon: <LaptopOutlined />, label: 'Devices' },
   { key: '/seo', icon: <SearchOutlined />, label: 'SEO audit' },
+  { key: '/growth', icon: <BulbOutlined />, label: 'Growth suggestions' },
+  { key: '/ask', icon: <CommentOutlined />, label: 'Ask AI' },
   { key: '/sites', icon: <SettingOutlined />, label: 'Sites' },
 ];
 

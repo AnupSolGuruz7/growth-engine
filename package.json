@@ -2,7 +2,9 @@
   "name": "growthos",
   "private": true,
   "packageManager": "pnpm@9.15.9",
-  "engines": { "node": ">=20.19" },
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel --filter=!@growthos/shared-types --filter=!@growthos/db",
@@ -14,7 +16,8 @@
     "infra:down": "docker compose down",
     "db:migrate": "pnpm --filter @growthos/db migrate",
     "db:seed": "pnpm --filter @growthos/db seed",
-    "db:seed-demo": "pnpm --filter @growthos/db seed:demo"
+    "db:seed-demo": "pnpm --filter @growthos/db seed:demo",
+    "ai:eval": "node scripts/ai-eval.mjs"
   },
   "devDependencies": {
     "@types/node": "20.19.43",

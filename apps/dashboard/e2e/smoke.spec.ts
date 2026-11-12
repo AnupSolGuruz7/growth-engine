@@ -45,3 +45,18 @@ test('sites page shows the install snippet', async ({ page }) => {
   await page.goto('/sites');
   await expect(page.getByText('data-site-id="gos_demo_local"')).toBeVisible({ timeout: 15_000 });
 });
+
+test('SEO audit page renders', async ({ page }) => {
+  await page.goto('/seo');
+  await expect(page.getByRole('heading', { name: 'SEO audit' })).toBeVisible();
+  await expect(page.getByTestId('run-audit')).toBeVisible();
+});
+
+test('AI pages render (setup card without a key, the feature with one)', async ({ page }) => {
+  const status = await (await page.request.get('http://localhost:4000/health')).json();
+  expect(status.status).toBe('ok');
+  for (const path of ['/growth', '/ask']) {
+    await page.goto(path);
+    await expect(page.getByTestId('ai-setup').or(page.locator('.page-head'))).toBeVisible();
+  }
+});

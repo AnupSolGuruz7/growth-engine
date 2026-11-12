@@ -1,14 +1,22 @@
 # GrowthOS
 
-Website activity tracking and analytics. This is the **auth-free testing build**: the tracking SDK (M1), event ingestion and processing, and the analytics dashboard (M2). The full product spec is in [docs/spec.md](docs/spec.md).
+Website activity tracking, analytics, SEO audits and AI growth suggestions. This is the **auth-free testing build**. It covers:
+
+- the tracking SDK, event ingestion and the analytics dashboard (spec M1–M2)
+- the SEO audit (M4)
+- AI suggestions and Ask AI (M5)
+
+The full product spec is in [docs/spec.md](docs/spec.md).
 
 ```
 website ──SDK──▶ POST /v1/events/batch ──▶ Postgres (raw events, monthly partitions)
                        (api)                  │
                                               ▼
-                     BullMQ (Redis) ──▶ worker: sessions + daily rollups
+                     BullMQ (Redis) ──▶ worker: sessions + daily rollups, SEO crawls
                                               │
-                 dashboard ◀── /v1/analytics/* (api, X-Dev-Key)
+                 dashboard ◀── /v1/analytics/*, /v1/seo/*, /v1/suggestions, /v1/ai/* (api, X-Dev-Key)
+                                                                   │
+                                                     Claude (read-only tools, evidence-checked)
 ```
 
 | Package | What it is |
@@ -16,8 +24,9 @@ website ──SDK──▶ POST /v1/events/batch ──▶ Postgres (raw events,
 | [packages/sdk](packages/sdk) | Zero-dependency tracker. ESM + script-tag IIFE (about 3 KB gzipped) |
 | [packages/shared-types](packages/shared-types) | zod schemas, API types, and URL/bot/device/channel helpers |
 | [packages/db](packages/db) | TypeORM migrations, the dedup insert, sessionisation and rollups, seeds |
-| [services/api](services/api) | NestJS: ingestion, sites, analytics, `/health`, `/metrics`, `/sdk.js` |
-| [services/worker](services/worker) | NestJS standalone + BullMQ: processing, partitions, dead-letter queue |
+| [packages/seo](packages/seo) | SEO crawler (robots, sitemap, SSRF guard), HTML parsing, checks, scoring, PageSpeed client |
+| [services/api](services/api) | NestJS: ingestion, sites, analytics, SEO audits, AI (suggestions, Ask AI, drafts), `/health`, `/metrics`, `/sdk.js` |
+| [services/worker](services/worker) | NestJS standalone + BullMQ: processing, partitions, SEO audits, dead-letter queue |
 | [apps/dashboard](apps/dashboard) | React + Ant Design + Recharts dashboard |
 | [apps/demo-site](apps/demo-site) | Multi-page site (script-tag install) plus an `/app` SPA (npm install) |
 
@@ -163,6 +172,12 @@ Every route except `POST /v1/events/batch`, `GET /health` and `GET /sdk.js` requ
 | `GET /v1/analytics/pages` · `sources` · `events` · `devices` | Reports (`events` accepts `event_name` for a property breakdown) |
 | `GET /v1/analytics/realtime?site_id=` | Active visitors in the last 5 minutes plus the latest events (raw) |
 | `GET /v1/analytics/export.csv?report=pages\|sources\|events` | CSV of the same range |
+| `POST /v1/seo/audits` · `GET /v1/seo/audits?site_id=` · `GET /v1/seo/audits/:id` | Start (409 while one runs) and list SEO audits; detail includes the score, summary and change since the previous audit |
+| `GET /v1/seo/audits/:id/findings` · `/pages` · `/page?url=` · `/compare/:prevId` | Findings (with new/unchanged flags), crawled pages, one page's SEO content, and an audit-to-audit diff |
+| `POST /v1/seo/findings/:id/draft` | AI-drafted, ready-to-paste copy for a finding (cached; `{"regenerate": true}` to redo) |
+| `GET /v1/suggestions?site_id=` · `POST /v1/suggestions/generate` · `PATCH /v1/suggestions/:id` | AI growth suggestions: list, generate (runs in the background), and set status (`new`, `accepted`, `dismissed` or `done`) |
+| `POST /v1/ai/ask` · `GET /v1/ai/conversations?site_id=` · `GET /v1/ai/conversations/:id` | Ask AI (pass `conversation_id` to continue a conversation) |
+| `GET /v1/ai/status?site_id=` | Whether AI is configured, this month's spend against the budget, and Ask AI questions used today |
 
 Analytics queries take `site_id`, `from` and `to` as **inclusive dates in the site timezone** (`YYYY-MM-DD`). The range is at most 400 days.
 
@@ -188,6 +203,54 @@ How the processing works:
   pnpm --filter @growthos/worker backfill <site-uuid> <from> <to>
   ```
 
+## SEO audit
+
+Open **SEO audit** in the dashboard and click **Run audit**. The worker crawls the site's own domain:
+
+- **Scope:** it starts at `https://<domain>/` (or a start URL you give on that domain) and stays on that host. www and non-www count as the same site.
+- **Rules it follows:** it obeys `robots.txt` and reads the sitemap. It sends GET requests only, never submits forms, and never changes the site.
+- **Limits:** up to 500 pages, about 1.5 requests per second (`SEO_CONCURRENCY`, `SEO_CRAWL_DELAY_MS`).
+- **Network safety:** it refuses localhost and private network addresses. The check runs on the address it actually connects to, so redirects and DNS tricks can't get around it. For local testing, `SEO_ALLOW_PRIVATE_HOSTS=true` (your local `.env` has it on, which is how the demo site at `localhost:5174` is audited).
+- **What it checks:**
+  - **Technical:** robots.txt and the sitemap, status codes and broken internal links, redirect chains, canonicals (including paginated pages), noindex conflicts, HTTPS and www/trailing-slash duplicates, orphan pages, the mobile viewport, and pages whose content is rendered by JavaScript.
+  - **On-page:** titles and meta descriptions (missing, length, duplicates), H1s and heading structure (including bold text used as headings), image alt text, structured data (JSON-LD), thin content and test pages.
+  - **Performance:** slow responses, render-blocking resources, very large HTML, and Core Web Vitals from Google PageSpeed Insights for the top pages. That last one only works for public sites; set `PAGESPEED_API_KEY` for a higher quota.
+- **Each finding has** evidence, a severity, an explanation, a concrete fix, a confidence and limits. Findings are ranked by severity × confidence × **the page's real traffic from your analytics** ÷ effort. The 0–100 score caps how much any single check can cost, so one noisy check can't sink it.
+- **Page explorer:** each crawled page's title, description, canonical, robots, heading outline, links, images and structured data, with a Google-style result preview.
+- **Re-audit:** run the audit again after applying fixes. The dashboard marks findings as new or resolved.
+
+Search Console (spec §7.2) is not connected yet.
+
+## AI insights (Claude)
+
+Add `ANTHROPIC_API_KEY` to `.env` and restart the API. Without it the AI pages show setup steps, and the endpoints answer `503 ai_not_configured`. The model is Claude Opus 5.5 (`AI_MODEL`), behind a provider-agnostic `LlmProvider` interface (spec §8.4).
+
+- **Growth suggestions:**
+  - **What it reads:** the last 28 days against the 28 before (overview, landing pages, channels, campaigns, referrers, events, which pages custom events happen on, devices) plus the latest SEO audit's top findings. Every number is a fact with an ID (for example `landing:/pricing.bounce_rate`).
+  - **What comes back:** prioritised SEO, content and marketing suggestions. Each one cites facts by ID and value.
+  - **The safeguard:** the server checks every cited ID and value against the data, discards anything that doesn't match, and shows why. Links to reports are computed by the server, not taken from the model.
+  - **Tracking:** mark suggestions `accepted`, `dismissed` or `done`. Once done, a before/after comparison of the chosen metric appears as data comes in.
+- **Ask AI:**
+  - **Tools:** the model answers through read-only tools (overview, top pages, landing pages, sources, events, devices, compare periods, SEO findings). These call the same services as the reports, so numbers match the dashboard.
+  - **Site scoping:** the site is fixed by the server, and the model can't choose or change it.
+  - **Answer format:** answers state the date range, separate facts from hypotheses, say plainly when data isn't available (goals, revenue, rankings), and link to the relevant report.
+- **Draft fix with AI:** on title, meta description, heading, alt-text, structured-data and thin-content findings, Claude writes ready-to-paste copy from the page's crawled text. You apply it yourself; GrowthOS never writes to your site.
+- **Guard rails:**
+  - **Budget:** a monthly spend cap per site (`AI_MONTHLY_BUDGET_USD`, default $20) and a daily Ask AI limit (`AI_ASK_DAILY_LIMIT`, default 50), both computed from logged token usage.
+  - **Audit log:** every model call and tool call is recorded (`ai_calls`, `ai_tool_calls`). The log is kept even when a site's data is deleted.
+  - **Prompt injection:** website and visitor text (page content, titles, event names) is passed inside tagged data blocks that the instructions say never to obey.
+  - **Refusals:** if Claude declines a request, the server can retry it on a fallback model (`server-side-fallback`, default routing).
+
+**Rough costs at Opus 5.5 prices** (the dashboard shows actual spend):
+
+| Action | Cost |
+|---|---|
+| Generating suggestions | $0.20–0.60 per run |
+| One Ask AI question | $0.02–0.20 |
+| One draft | about $0.01 |
+
+**Accuracy check (costs money):** `pnpm ai:eval [site-uuid]` asks about 30 questions whose answers come from the analytics API. It checks that the numbers appear in the answers, that missing data is admitted, and that a planted prompt injection is ignored. It prints the pass rate and the cost of the run.
+
 ## Privacy
 
 - **Data minimisation:**
@@ -212,8 +275,11 @@ Sample wording for a site's privacy notice:
 | db | `pnpm --filter @growthos/db test` | Dedup, timezone `local_date`, late partition creation, consent stitching, idempotent processing |
 | SDK | `pnpm --filter @growthos/sdk test` | Vitest + happy-dom: init, batching, beacon, consent, SPA navigation, outbound clicks, URL sanitising, failure isolation, retry queue, bundle size |
 | API e2e | `pnpm --filter @growthos/api test` | Valid, invalid, duplicate, inactive and unknown site, rotate, rate limits, bots, 64 KB limit, dev key; analytics against a **hand-computed fixture** (sessions, bounce, channels, New York midnight boundary, CSV, tenant scoping) |
-| worker | `pnpm --filter @growthos/worker test` | Processing job, midnight split, retries, dead-letter queue |
+| seo | `pnpm --filter @growthos/seo test` | Crawler against a local fixture site with planted issues: robots respected, GET only, redirect chains, page limit, SSRF guard; every expected finding, no false positives (decorative alt, localhost HTTPS), JavaScript-rendered pages, scoring, PageSpeed parsing |
+| API e2e (SEO, AI) | `pnpm --filter @growthos/api test` | SEO endpoints, 409 while an audit runs, domain-only start URLs, audit diff, tenant scoping. AI with a **scripted provider (no API cost)**: invented numbers and unknown facts dropped, cost logging, status and before/after, tools fixed to the site, untrusted text fenced, drafts cached, budget and daily limits, 503 without a key |
+| worker | `pnpm --filter @growthos/worker test` | Processing job, midnight split, retries, dead-letter queue, a full SEO audit run against the fixture site |
 | dashboard | `pnpm --filter @growthos/dashboard test` | Playwright smoke test of every page against seeded data |
+| AI accuracy (opt-in, paid) | `pnpm ai:eval` | About 30 questions with known answers against real Claude |
 
 Notes on the dashboard smoke test:
 
@@ -229,9 +295,9 @@ Notes on the dashboard smoke test:
 ## Not in this build yet
 
 - **From the spec:**
-  - Goals and funnels (M3)
-  - SEO audit (M4)
-  - AI suggestions (M5)
+  - Goals and funnels (M3). AI suggestions use custom events as stand-ins for conversions until then.
+  - Search Console integration (M4)
   - Auth (M6)
+- **SEO crawler:** it doesn't run JavaScript. Pages rendered by JavaScript are flagged, and their content checks are marked low-confidence; rendering them with Playwright is not built.
 - **Report filters:** the spec's channel, campaign, device and page-path filters aren't built. Reports filter by site, date range and comparison period only.
 - **Automatic retention:** only per-site deletion exists (`DELETE /v1/sites/:id/data`). Automatic retention (proposed: 13 months raw) is an open item in spec §16.

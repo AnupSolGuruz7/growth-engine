@@ -4,6 +4,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './AppLayout';
+import { AskAiPage } from './pages/AskAi';
+import { GrowthPage } from './pages/Growth';
 import { DevicesPage } from './pages/Devices';
 import { EventsPage } from './pages/Events';
 import { OverviewPage } from './pages/Overview';
@@ -34,6 +36,8 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="events" element={<EventsPage />} />
                 <Route path="devices" element={<DevicesPage />} />
                 <Route path="seo" element={<SeoPage />} />
+                <Route path="growth" element={<GrowthPage />} />
+                <Route path="ask" element={<AskAiPage />} />
                 <Route path="sites" element={<SitesPage />} />
                 <Route path="*" element={<OverviewPage />} />
               </Route>

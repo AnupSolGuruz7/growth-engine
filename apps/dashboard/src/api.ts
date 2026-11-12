@@ -1,4 +1,11 @@
 import type {
+  AiStatusDto,
+  ConversationDto,
+  DraftDto,
+  SuggestionDto,
+  SuggestionRunDto,
+  SuggestionStatus,
+  SuggestionsResponse,
   CreateAuditInput,
   CreateSiteInput,
   DevicesResponse,
@@ -89,6 +96,16 @@ export const api = {
   seoPages: (id: string) => json<SeoPageRow[]>(`/v1/seo/audits/${id}/pages`),
   seoPage: (id: string, url: string) => json<SeoPageDetail>(`/v1/seo/audits/${id}/page` + qs({ url })),
   seoCompare: (id: string, prevId: string) => json<SeoComparisonDto>(`/v1/seo/audits/${id}/compare/${prevId}`),
+
+  aiStatus: (siteId: string) => json<AiStatusDto>('/v1/ai/status' + qs({ site_id: siteId })),
+  suggestions: (siteId: string) => json<SuggestionsResponse>('/v1/suggestions' + qs({ site_id: siteId })),
+  generateSuggestions: (siteId: string) => json<SuggestionRunDto>('/v1/suggestions/generate', { method: 'POST', body: JSON.stringify({ site_id: siteId }) }),
+  updateSuggestion: (id: string, status: SuggestionStatus) => json<SuggestionDto>(`/v1/suggestions/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  ask: (siteId: string, question: string, conversationId?: string) =>
+    json<ConversationDto>('/v1/ai/ask', { method: 'POST', body: JSON.stringify({ site_id: siteId, question, conversation_id: conversationId }) }),
+  conversations: (siteId: string) => json<Omit<ConversationDto, 'transcript'>[]>('/v1/ai/conversations' + qs({ site_id: siteId })),
+  conversation: (id: string) => json<ConversationDto>(`/v1/ai/conversations/${id}`),
+  draftFix: (findingId: string, regenerate = false) => json<DraftDto>(`/v1/seo/findings/${findingId}/draft`, { method: 'POST', body: JSON.stringify({ regenerate }) }),
 
   /** Fetches the CSV with the dev key header and hands it to the browser as a file. */
   async downloadCsv(report: ExportReport, q: RangeQuery): Promise<void> {
