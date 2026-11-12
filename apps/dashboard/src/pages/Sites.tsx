@@ -7,6 +7,7 @@ import { InstallSnippet, VerifyInstall } from '../components/InstallSnippet';
 import { timeAgo } from '../dates';
 import { useDashboard } from '../store';
 import { useSites } from '../hooks';
+import { PageHeader } from '../components/PageHeader';
 
 function SiteDetail({ id }: { id: string }) {
   const qc = useQueryClient();
@@ -64,9 +65,7 @@ export function SitesPage() {
   const current = open ?? sites?.[0]?.id ?? null;
   return (
     <section>
-      <div className="page-head">
-        <Typography.Title level={3} style={{ margin: 0 }}>Sites</Typography.Title>
-      </div>
+      <PageHeader title="Sites & install" description="Your websites, their tracking snippet, and whether events are arriving." />
       <div className="stack">
         <Card size="small">
           <Table<SiteDto>

@@ -1,7 +1,7 @@
 import { PlayCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
-  Alert, App, Button, Card, Descriptions, Drawer, Empty, Form, Input, InputNumber, List, Popover, Progress, Result,
-  Segmented, Select, Space, Spin, Table, Tabs, Tag, Typography,
+  Alert, App, Button, Card, Collapse, Descriptions, Drawer, Empty, Form, Grid, Input, InputNumber, List, Popover, Progress,
+  Result, Segmented, Select, Space, Spin, Table, Tabs, Tag, Typography,
 } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
@@ -9,7 +9,8 @@ import { Link } from 'react-router-dom';
 import type { SeoAuditDto, SeoFindingDto, SeoPageRow, SeoSeverity } from '@growthos/shared-types';
 import { api, ApiError } from '../api';
 import { DraftFix, canDraft } from '../components/seo/DraftFix';
-import { CATEGORY_LABEL, Evidence, SerpPreview, SeverityTag, scoreBand, shortUrl } from '../components/seo/SeoBits';
+import { PageHeader } from '../components/PageHeader';
+import { CATEGORY_LABEL, CHECK_LABEL, Evidence, SerpPreview, SeverityTag, scoreBand, shortUrl } from '../components/seo/SeoBits';
 import { fmtNumber, timeAgo } from '../dates';
 import { useCurrentSite } from '../hooks';
 
@@ -98,7 +99,7 @@ function ScoreCard({ audit }: { audit: SeoAuditDto }) {
           <Descriptions.Item label="Errors / redirects">{s.pages.errors} / {s.pages.redirects}</Descriptions.Item>
           <Descriptions.Item label="Blocked by robots">{s.pages.blocked_by_robots}</Descriptions.Item>
           <Descriptions.Item label="Core Web Vitals">
-            {s.pagespeed.tested ? `${s.pagespeed.tested} pages tested` : <Typography.Text type="secondary">{s.pagespeed.skipped_reason === 'private_host' ? 'not available for local sites' : s.pagespeed.skipped_reason ?? '—'}</Typography.Text>}
+            {s.pagespeed.tested ? `${s.pagespeed.tested} pages tested` : <Typography.Text type="secondary">{s.pagespeed.skipped_reason === 'private_host' ? 'not available for local sites' : s.pagespeed.skipped_reason === 'disabled' ? 'turned off (PAGESPEED_ENABLED)' : s.pagespeed.skipped_reason === 'pagespeed_unavailable' ? 'Google PageSpeed did not respond. Add a free PAGESPEED_API_KEY.' : s.pagespeed.skipped_reason ?? '—'}</Typography.Text>}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -155,6 +156,90 @@ function FindingDrawer({ finding, onClose }: { finding: SeoFindingDto | null; on
   );
 }
 
+interface IssueGroup {
+  check: string;
+  label: string;
+  severity: SeoSeverity;
+  findings: SeoFindingDto[];
+  pageviews: number;
+  priority: number;
+  isNew: number;
+}
+
+/** One group per issue type, highest-priority first (severity, then traffic affected). */
+function groupFindings(findings: SeoFindingDto[]): IssueGroup[] {
+  const by = new Map<string, SeoFindingDto[]>();
+  for (const f of findings) by.set(f.check_id, [...(by.get(f.check_id) ?? []), f]);
+  return [...by.entries()]
+    .map(([check, fs]) => ({
+      check,
+      label: CHECK_LABEL[check] ?? fs[0]!.title,
+      severity: SEV_ORDER.find((s) => fs.some((f) => f.severity === s))!,
+      findings: fs,
+      pageviews: fs.reduce((s, f) => s + f.pageviews_28d, 0),
+      priority: fs.reduce((s, f) => s + f.priority, 0),
+      isNew: fs.filter((f) => f.change === 'new').length,
+    }))
+    .sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity) || b.priority - a.priority);
+}
+
+function IssueGroups({ groups, loading, onOpen }: { groups: IssueGroup[]; loading: boolean; onOpen: (f: SeoFindingDto) => void }) {
+  const [shown, setShown] = useState<Record<string, number>>({});
+  if (loading) return <Spin style={{ display: 'block', margin: '40px auto' }} />;
+  if (!groups.length) return <Empty description="No issues match — nice work" />;
+  return (
+    <Collapse
+      className="issue-groups"
+      expandIconPosition="end"
+      items={groups.map((g) => {
+        const limit = shown[g.check] ?? 10;
+        const sample = g.findings[0]!;
+        return {
+          key: g.check,
+          label: (
+            <div className="issue-head">
+              <SeverityTag severity={g.severity} />
+              <div style={{ minWidth: 0 }}>
+                <div className="issue-label">{g.label}</div>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {g.findings.length === 1 ? shortUrl(sample.url) : `${g.findings.length} pages`}
+                  {g.pageviews > 0 && ` · ${fmtNumber(g.pageviews)} page views affected`}
+                  {g.isNew > 0 && ` · ${g.isNew} new`}
+                </Typography.Text>
+              </div>
+              {canDraft(sample) && <Tag bordered={false} color="purple" className="issue-ai">AI draft</Tag>}
+            </div>
+          ),
+          children: (
+            <div>
+              <Typography.Paragraph type="secondary" style={{ marginBottom: 6 }}>{sample.explanation}</Typography.Paragraph>
+              <Typography.Paragraph style={{ marginBottom: 10 }}><b>Fix:</b> {sample.suggested_fix}</Typography.Paragraph>
+              <ul className="issue-pages">
+                {g.findings.slice(0, limit).map((f) => (
+                  <li key={f.id}>
+                    <button type="button" onClick={() => onOpen(f)} className="linklike">
+                      <span className="ellipsis-block">{shortUrl(f.url)}</span>
+                      <Typography.Text type="secondary" style={{ fontSize: 12, flex: 'none' }}>
+                        {f.title !== g.label && f.title !== sample.title ? f.title : ''}
+                        {f.pageviews_28d ? ` ${fmtNumber(f.pageviews_28d)} views` : ''}
+                      </Typography.Text>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {g.findings.length > limit && (
+                <Button size="small" type="link" onClick={() => setShown({ ...shown, [g.check]: limit + 50 })}>
+                  Show {Math.min(50, g.findings.length - limit)} more of {g.findings.length - limit}
+                </Button>
+              )}
+            </div>
+          ),
+        };
+      })}
+    />
+  );
+}
+
 function FindingsTab({ audit }: { audit: SeoAuditDto }) {
   const { data, isLoading } = useQuery({ queryKey: ['seo-findings', audit.id], queryFn: () => api.seoFindings(audit.id) });
   const resolved = useQuery({
@@ -164,49 +249,91 @@ function FindingsTab({ audit }: { audit: SeoAuditDto }) {
   });
   const [severity, setSeverity] = useState<SeoSeverity | 'all'>('all');
   const [category, setCategory] = useState<string>('all');
+  const [view, setView] = useState<'issues' | 'all'>('issues');
   const [open, setOpen] = useState<SeoFindingDto | null>(null);
+  const screens = Grid.useBreakpoint();
   const rows = useMemo(
     () => (data ?? []).filter((f) => (severity === 'all' || f.severity === severity) && (category === 'all' || f.category === category)),
     [data, severity, category],
   );
+  const groups = useMemo(() => groupFindings(rows), [rows]);
+  const count = (s: SeoSeverity) => (data ?? []).filter((f) => f.severity === s).length;
   return (
     <>
-      <Space wrap style={{ marginBottom: 12 }}>
+      <div className="findings-toolbar">
         <Segmented
-          size="small"
-          value={severity}
-          onChange={(v) => setSeverity(v as SeoSeverity | 'all')}
-          options={[{ value: 'all', label: `All (${data?.length ?? 0})` }, ...SEV_ORDER.map((s) => ({ value: s, label: `${s[0]!.toUpperCase()}${s.slice(1)} (${(data ?? []).filter((f) => f.severity === s).length})` }))]}
+          value={view}
+          onChange={(v) => setView(v as 'issues' | 'all')}
+          options={[
+            { value: 'issues', label: `By issue (${groupFindings(data ?? []).length})` },
+            { value: 'all', label: `All findings (${data?.length ?? 0})` },
+          ]}
         />
-        <Select size="small" value={category} onChange={setCategory} style={{ width: 150 }} aria-label="Category"
-          options={[{ value: 'all', label: 'All categories' }, ...Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label }))]} />
-      </Space>
-      <Table<SeoFindingDto>
-        size="small"
-        rowKey="id"
-        loading={isLoading}
-        dataSource={rows}
-        scroll={{ x: 'max-content' }}
-        pagination={{ pageSize: 25, size: 'small', showSizeChanger: false }}
-        onRow={(r) => ({ onClick: () => setOpen(r), style: { cursor: 'pointer' } })}
-        locale={{ emptyText: <Empty description="No issues match — nice work" /> }}
-        columns={[
-          { title: 'Severity', dataIndex: 'severity', width: 110, render: (s: SeoSeverity) => <SeverityTag severity={s} /> },
-          {
-            title: 'Issue',
-            key: 'title',
-            render: (_, r) => (
-              <>
-                {r.title} {r.change === 'new' && <Tag color="blue" bordered={false}>new</Tag>}
-                <div><Typography.Text type="secondary" style={{ fontSize: 12 }}>{shortUrl(r.url)}</Typography.Text></div>
-              </>
-            ),
-          },
-          { title: 'Category', dataIndex: 'category', width: 110, render: (c: string) => CATEGORY_LABEL[c] },
-          { title: 'Page views (28d)', dataIndex: 'pageviews_28d', width: 130, align: 'right', render: (v: number) => (v ? fmtNumber(v) : '—') },
-          { title: 'Priority', dataIndex: 'priority', width: 90, align: 'right', render: (v: number) => v.toFixed(1) },
-        ]}
-      />
+        <Space wrap size={8}>
+          <Select
+            value={severity}
+            onChange={setSeverity}
+            style={{ width: 150 }}
+            aria-label="Severity"
+            options={[{ value: 'all', label: 'All severities' }, ...SEV_ORDER.map((s) => ({ value: s, label: `${s[0]!.toUpperCase()}${s.slice(1)} (${count(s)})`, disabled: !count(s) }))]}
+          />
+          <Select value={category} onChange={setCategory} style={{ width: 150 }} aria-label="Category"
+            options={[{ value: 'all', label: 'All categories' }, ...Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label }))]} />
+        </Space>
+      </div>
+
+      {view === 'issues' ? (
+        <IssueGroups groups={groups} loading={isLoading} onOpen={setOpen} />
+      ) : !screens.md ? (
+        <List
+          loading={isLoading}
+          dataSource={rows}
+          pagination={rows.length > 20 ? { pageSize: 20, size: 'small', align: 'center' } : false}
+          locale={{ emptyText: <Empty description="No issues match — nice work" /> }}
+          renderItem={(r) => (
+            <List.Item className="finding-item" onClick={() => setOpen(r)}>
+              <div style={{ minWidth: 0, width: '100%' }}>
+                <Space size={6} wrap>
+                  <SeverityTag severity={r.severity} />
+                  {r.change === 'new' && <Tag color="blue" bordered={false}>new</Tag>}
+                  {canDraft(r) && <Tag bordered={false} color="purple">AI draft</Tag>}
+                </Space>
+                <div className="finding-title">{r.title}</div>
+                <Typography.Text type="secondary" className="ellipsis-block" style={{ fontSize: 12 }}>
+                  {shortUrl(r.url)}{r.pageviews_28d ? ` · ${fmtNumber(r.pageviews_28d)} views` : ''}
+                </Typography.Text>
+              </div>
+            </List.Item>
+          )}
+        />
+      ) : (
+        <Table<SeoFindingDto>
+          size="small"
+          rowKey="id"
+          loading={isLoading}
+          dataSource={rows}
+          scroll={{ x: 'max-content' }}
+          pagination={{ pageSize: 25, size: 'small', showSizeChanger: false }}
+          onRow={(r) => ({ onClick: () => setOpen(r), style: { cursor: 'pointer' } })}
+          locale={{ emptyText: <Empty description="No issues match — nice work" /> }}
+          columns={[
+            { title: 'Severity', dataIndex: 'severity', width: 110, render: (s: SeoSeverity) => <SeverityTag severity={s} /> },
+            {
+              title: 'Issue',
+              key: 'title',
+              render: (_, r) => (
+                <>
+                  {r.title} {r.change === 'new' && <Tag color="blue" bordered={false}>new</Tag>}
+                  {canDraft(r) && <Tag bordered={false} color="purple">AI draft</Tag>}
+                  <div><Typography.Text type="secondary" style={{ fontSize: 12 }}>{shortUrl(r.url)}</Typography.Text></div>
+                </>
+              ),
+            },
+            { title: 'Category', dataIndex: 'category', width: 110, render: (c: string) => CATEGORY_LABEL[c] },
+            { title: 'Page views (28d)', dataIndex: 'pageviews_28d', width: 130, align: 'right', render: (v: number) => (v ? fmtNumber(v) : '—') },
+          ]}
+        />
+      )}
       {resolved.data && resolved.data.resolved.length > 0 && (
         <Card size="small" title={`Resolved since the previous audit (${resolved.data.counts.resolved})`} style={{ marginTop: 16 }}>
           <List
@@ -337,12 +464,29 @@ export function SeoPage() {
   const list = audits.data ?? [];
   const running = list.find((a) => a.status === 'queued' || a.status === 'running');
   const audit = list.find((a) => a.id === selected) ?? list.find((a) => a.status === 'completed') ?? null;
+  const [tipHidden, setTipHidden] = useState(() => {
+    try {
+      return localStorage.getItem('growthos-seo-tip') === 'hidden';
+    } catch {
+      return false;
+    }
+  });
+  const hideTip = () => {
+    setTipHidden(true);
+    try {
+      localStorage.setItem('growthos-seo-tip', 'hidden');
+    } catch {
+      /* per-browser convenience only */
+    }
+  };
 
   if (!site) return null;
   return (
     <section>
-      <div className="page-head">
-        <Typography.Title level={3} style={{ margin: 0 }}>SEO audit</Typography.Title>
+      <PageHeader
+        title="SEO audit"
+        description={`Crawls ${site.domain} like a search engine and lists what to fix, most important first. GrowthOS only reads pages; it never changes your site.`}
+        extra={
         <Space wrap>
           {list.filter((a) => a.status === 'completed').length > 1 && (
             <Select
@@ -351,13 +495,14 @@ export function SeoPage() {
               value={audit?.id}
               onChange={setSelected}
               aria-label="Audit"
-              options={list.filter((a) => a.status === 'completed').map((a) => ({ value: a.id, label: `${new Date(a.finished_at!).toLocaleString()} · score ${a.score}` }))}
+              options={list.filter((a) => a.status === 'completed').map((a) => ({ value: a.id, label: `${new Date(a.finished_at!).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · score ${a.score}` }))}
             />
           )}
           <Button icon={<ReloadOutlined />} onClick={() => audits.refetch()} aria-label="Refresh" />
           <RunAuditButton siteId={site.id} domain={site.domain} running={!!running} />
         </Space>
-      </div>
+        }
+      />
 
       {running && (
         <Alert
@@ -388,17 +533,19 @@ export function SeoPage() {
         )
       ) : (
         <>
-          <Alert
+          {!tipHidden && <Alert
             style={{ marginBottom: 16 }}
             type="info"
             showIcon
+            closable
+            onClose={hideTip}
             message={
               <>
                 Open a finding for its fix — title, description, heading and alt-text issues have a <b>Draft fix with AI</b> button. For
                 prioritised SEO and marketing ideas based on this audit plus your traffic, see <Link to="/growth">Growth suggestions</Link>.
               </>
             }
-          />
+          />}
           <ScoreCard audit={audit} />
           <Card size="small">
             <Tabs

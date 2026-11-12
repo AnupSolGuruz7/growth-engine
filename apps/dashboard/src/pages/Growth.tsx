@@ -8,6 +8,7 @@ import { api, ApiError } from '../api';
 import { AiError, AiSetupCard, BudgetMeter, Thinking, modelLabel, useAiStatus } from '../components/ai/AiBits';
 import { fmtNumber, timeAgo } from '../dates';
 import { useCurrentSite } from '../hooks';
+import { PageHeader } from '../components/PageHeader';
 
 const AREA: Record<string, { label: string; color: string }> = {
   seo: { label: 'SEO', color: 'blue' },
@@ -60,54 +61,73 @@ function Result({ s }: { s: SuggestionDto }) {
   );
 }
 
-function SuggestionCard({ s, siteId }: { s: SuggestionDto; siteId: string }) {
+const PRIORITY: Record<string, { label: string; cls: string }> = {
+  high: { label: 'High priority', cls: 'prio-high' },
+  medium: { label: 'Medium priority', cls: 'prio-medium' },
+  low: { label: 'Low priority', cls: 'prio-low' },
+};
+
+function SuggestionCard({ s, siteId, defaultOpen }: { s: SuggestionDto; siteId: string; defaultOpen?: boolean }) {
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const [open, setOpen] = useState(!!defaultOpen);
   const set = useMutation({
     mutationFn: (status: SuggestionStatus) => api.updateSuggestion(s.id, status),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['suggestions', siteId] }),
     onError: (e) => message.error((e as Error).message),
   });
+  const p = PRIORITY[s.priority]!;
   return (
     <Card size="small" className={`suggestion status-${s.status}`} data-testid="suggestion">
-      <Space wrap size={6} style={{ marginBottom: 6 }}>
-        <Tag color={AREA[s.area]!.color} bordered={false}>{AREA[s.area]!.label}</Tag>
-        <Tag bordered={false}>priority {s.priority}</Tag>
-        <Tag bordered={false}>effort {s.effort}</Tag>
-        <Tag bordered={false}>confidence {s.confidence}</Tag>
-        {s.status !== 'new' && <Tag color={s.status === 'done' ? 'green' : s.status === 'accepted' ? 'blue' : undefined}>{s.status}</Tag>}
-      </Space>
-      <Typography.Title level={5} style={{ margin: '2px 0 8px' }}>{s.title}</Typography.Title>
+      <div className="sugg-meta">
+        <span className={`prio ${p.cls}`}>{p.label}</span>
+        <Tag color={AREA[s.area]!.color} bordered={false} style={{ margin: 0 }}>{AREA[s.area]!.label}</Tag>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>effort {s.effort} · confidence {s.confidence}</Typography.Text>
+        {s.status !== 'new' && (
+          <Tag style={{ marginLeft: 'auto' }} color={s.status === 'done' ? 'green' : s.status === 'accepted' ? 'blue' : undefined}>{s.status}</Tag>
+        )}
+      </div>
+      <div className="sugg-title">{s.title}</div>
       <Typography.Paragraph style={{ marginBottom: 8 }}>{s.action}</Typography.Paragraph>
       {s.copy && (
         <Typography.Paragraph copyable={{ text: s.copy }} className="fix">
           {s.copy}
         </Typography.Paragraph>
       )}
-      <div className="sugg-grid">
-        <div>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>EVIDENCE (checked against your data)</Typography.Text>
-          <Evidence items={s.evidence} />
-        </div>
-        <div>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>EXPECTED OUTCOME</Typography.Text>
-          <div>{s.expected_outcome}</div>
-          <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>HOW TO MEASURE</Typography.Text>
+      {s.result && <Result s={s} />}
+      <button type="button" className="sugg-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {open ? 'Hide' : 'Why'} &amp; how to measure <span aria-hidden>{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <div className="sugg-details">
           <div>
-            Watch <Link to={s.evidence.find((e) => e.ref === s.measurement.metric_ref)?.link ?? '/'}>{humanLabel(s.measurement.label)}</Link> — should{' '}
-            {s.measurement.direction} over {s.measurement.window_days} days (now {fmtValue(s.measurement.metric_ref, s.measurement.baseline)}).
+            <div className="sugg-label">Evidence · checked against your data</div>
+            <Evidence items={s.evidence} />
+          </div>
+          <div>
+            <div className="sugg-label">Expected outcome</div>
+            <div>{s.expected_outcome}</div>
+            <div className="sugg-label" style={{ marginTop: 10 }}>How to measure</div>
+            <div>
+              Watch <Link to={s.evidence.find((e) => e.ref === s.measurement.metric_ref)?.link ?? '/'}>{humanLabel(s.measurement.label)}</Link>. It should{' '}
+              {s.measurement.direction} over {s.measurement.window_days} days (now {fmtValue(s.measurement.metric_ref, s.measurement.baseline)}).
+            </div>
+            {s.assumptions && (
+              <>
+                <div className="sugg-label" style={{ marginTop: 10 }}>Assumption</div>
+                <Typography.Text type="secondary">{s.assumptions}</Typography.Text>
+              </>
+            )}
           </div>
         </div>
-      </div>
-      {s.assumptions && <Alert type="info" showIcon message={s.assumptions} style={{ marginTop: 10 }} />}
-      {s.result && <Result s={s} />}
-      <Space wrap style={{ marginTop: 12 }}>
-        {s.status === 'new' && <Button size="small" icon={<LikeOutlined />} onClick={() => set.mutate('accepted')} loading={set.isPending}>Accept</Button>}
+      )}
+      <div className="sugg-actions">
         {s.status !== 'done' && <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => set.mutate('done')} loading={set.isPending}>Mark done</Button>}
-        {s.status !== 'dismissed' && s.status !== 'done' && <Button size="small" icon={<CloseOutlined />} onClick={() => set.mutate('dismissed')} loading={set.isPending}>Dismiss</Button>}
+        {s.status === 'new' && <Button size="small" icon={<LikeOutlined />} onClick={() => set.mutate('accepted')} loading={set.isPending}>Accept</Button>}
+        {s.status !== 'dismissed' && s.status !== 'done' && <Button size="small" type="text" icon={<CloseOutlined />} onClick={() => set.mutate('dismissed')} loading={set.isPending}>Dismiss</Button>}
         {(s.status === 'dismissed' || s.status === 'done') && <Button size="small" type="link" onClick={() => set.mutate('new')}>Reopen</Button>}
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>suggested {timeAgo(s.created_at)}</Typography.Text>
-      </Space>
+        <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 'auto' }}>suggested {timeAgo(s.created_at)}</Typography.Text>
+      </div>
     </Card>
   );
 }
@@ -139,9 +159,10 @@ export function GrowthPage() {
 
   return (
     <section>
-      <div className="page-head">
-        <Typography.Title level={3} style={{ margin: 0 }}>Growth suggestions</Typography.Title>
-        {status.data?.configured && (
+      <PageHeader
+        title="Growth suggestions"
+        description="Prioritised SEO, content and marketing ideas from your last 28 days of traffic and your latest SEO audit. Every number is checked against your data."
+        extra={status.data?.configured && (
           <Space wrap align="center">
             <BudgetMeter status={status.data} />
             <Button type="primary" icon={<BulbOutlined />} onClick={() => generate.mutate()} loading={generate.isPending} disabled={running} data-testid="generate">
@@ -149,7 +170,7 @@ export function GrowthPage() {
             </Button>
           </Space>
         )}
-      </div>
+      />
       {status.isLoading ? (
         <Spin />
       ) : !status.data?.configured ? (
@@ -192,7 +213,7 @@ export function GrowthPage() {
           {list.isLoading ? (
             <Spin />
           ) : shown.length ? (
-            <div className="stack">{shown.map((s) => <SuggestionCard key={s.id} s={s} siteId={site.id} />)}</div>
+            <div className="stack">{shown.map((s, i) => <SuggestionCard key={s.id} s={s} siteId={site.id} defaultOpen={i === 0} />)}</div>
           ) : (
             <Empty
               description={

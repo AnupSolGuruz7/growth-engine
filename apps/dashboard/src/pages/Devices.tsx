@@ -11,7 +11,7 @@ const LABEL: Record<string, string> = { desktop: 'Desktop', mobile: 'Mobile', ta
 export function DevicesPage() {
   const { data, isLoading } = useReport('devices', api.devices);
   return (
-    <ReportPage title="Devices">
+    <ReportPage title="Devices" description="Desktop, mobile and tablet traffic, and how engaged each one is.">
       <Card size="small" title="Device category">
         <BarTable<DeviceRow>
           rows={data?.devices ?? []}

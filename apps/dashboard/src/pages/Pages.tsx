@@ -16,7 +16,7 @@ export function PagesPage() {
   const { data, isLoading } = useReport('pages', api.pages);
   const path = (r: { page_path: string }) => r.page_path;
   return (
-    <ReportPage title="Pages" extra={<ExportButton report="pages" />}>
+    <ReportPage title="Pages" description="Which pages people view, enter the site on, and leave from." extra={<ExportButton report="pages" />}>
       <Card size="small">
         <Tabs
           items={[

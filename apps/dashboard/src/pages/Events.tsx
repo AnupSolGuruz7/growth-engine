@@ -14,7 +14,7 @@ export function EventsPage() {
   const [selected, setSelected] = useState<string | undefined>();
   const { data, isLoading } = useReport('events', (q) => api.events(q, selected), [selected]);
   return (
-    <ReportPage title="Events" extra={<ExportButton report="events" />}>
+    <ReportPage title="Events" description="Custom events and clicks. Select an event to break it down by its properties." extra={<ExportButton report="events" />}>
       <div className="grid-2">
         <Card size="small" title="All events" extra={<Typography.Text type="secondary">Click a row for its properties</Typography.Text>}>
           <BarTable<EventRow>

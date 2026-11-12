@@ -7,6 +7,7 @@ import { api } from '../api';
 import { AiError, AiMarkdown, AiSetupCard, Thinking, modelLabel, useAiStatus } from '../components/ai/AiBits';
 import { timeAgo } from '../dates';
 import { useCurrentSite } from '../hooks';
+import { PageHeader } from '../components/PageHeader';
 
 const STARTERS = [
   'How did traffic change in the last 28 days compared with the 28 days before?',
@@ -79,12 +80,13 @@ export function AskAiPage() {
 
   return (
     <section>
-      <div className="page-head">
-        <Typography.Title level={3} style={{ margin: 0 }}>Ask AI</Typography.Title>
-        {status.data?.configured && (
-          <Typography.Text type="secondary">{status.data.asks_today} of {status.data.ask_daily_limit} questions today · answers use {site.name}'s data only</Typography.Text>
+      <PageHeader
+        title="Ask AI"
+        description={`Ask anything about ${site.domain}'s traffic, pages, sources, events or SEO. Answers use this site's data only.`}
+        extra={status.data?.configured && (
+          <Typography.Text type="secondary">{status.data.asks_today} of {status.data.ask_daily_limit} questions today</Typography.Text>
         )}
-      </div>
+      />
       {!status.isLoading && !status.data?.configured ? (
         <AiSetupCard />
       ) : (
@@ -114,7 +116,7 @@ export function AskAiPage() {
                       <span>Ask anything about {site.domain}'s traffic, pages, sources, events or SEO.</span>
                       <Space wrap style={{ justifyContent: 'center' }}>
                         {STARTERS.map((s) => (
-                          <Button key={s} size="small" onClick={() => send(s)}>{s}</Button>
+                          <Button key={s} size="small" className="starter-btn" onClick={() => send(s)}>{s}</Button>
                         ))}
                       </Space>
                     </Space>

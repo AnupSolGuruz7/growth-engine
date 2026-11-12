@@ -16,7 +16,7 @@ export function RealtimePage() {
     refetchInterval: 10_000,
   });
   return (
-    <ReportPage title="Realtime">
+    <ReportPage title="Realtime" description="Who is on the site right now. Refreshes every 10 seconds.">
       <div className="grid-2" style={{ marginBottom: 16 }}>
         <Card size="small">
           <Typography.Text type="secondary">

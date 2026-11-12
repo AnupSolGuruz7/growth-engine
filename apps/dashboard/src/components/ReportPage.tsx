@@ -1,13 +1,14 @@
-import { Alert, Result, Spin, Typography } from 'antd';
+import { Alert, Result, Spin } from 'antd';
 import type { ReactNode } from 'react';
 import { useCurrentSite } from '../hooks';
 import { NoDataYet } from './InstallSnippet';
+import { PageHeader } from './PageHeader';
 
 /**
  * Wraps every report: handles "API unreachable", "no sites yet" and "site never received an event"
  * (install snippet + verify) before rendering the report body.
  */
-export function ReportPage({ title, extra, children }: { title: string; extra?: ReactNode; children: ReactNode }) {
+export function ReportPage({ title, description, extra, children }: { title: string; description?: ReactNode; extra?: ReactNode; children: ReactNode }) {
   const { site, detail, isLoading, error, sites } = useCurrentSite();
   let body: ReactNode = children;
   if (error) body = <Alert type="error" showIcon message="Could not load sites" description={(error as Error).message} />;
@@ -18,12 +19,7 @@ export function ReportPage({ title, extra, children }: { title: string; extra?: 
 
   return (
     <section>
-      <div className="page-head">
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          {title}
-        </Typography.Title>
-        {site && detail.data?.last_event_received_at && extra}
-      </div>
+      <PageHeader title={title} description={description} extra={site && detail.data?.last_event_received_at ? extra : undefined} />
       {body}
     </section>
   );

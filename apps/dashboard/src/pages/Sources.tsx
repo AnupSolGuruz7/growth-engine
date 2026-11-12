@@ -19,7 +19,7 @@ const bounceCol = <T extends { bounce_rate: number }>() => ({
 export function SourcesPage() {
   const { data, isLoading } = useReport('sources', api.sources);
   return (
-    <ReportPage title="Sources" extra={<ExportButton report="sources" />}>
+    <ReportPage title="Sources" description="Where visitors come from: channels, referring sites and tagged campaigns." extra={<ExportButton report="sources" />}>
       <div className="stack">
         <Card size="small" title="Channels">
           <BarTable<ChannelRow>
