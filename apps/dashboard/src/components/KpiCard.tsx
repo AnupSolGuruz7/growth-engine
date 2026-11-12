@@ -47,12 +47,12 @@ export function KpiCard({ title, value, format, previous, lowerIsBetter, hint, f
           )}
         </div>
       )}
-      {spark && <Sparkline values={spark} label={title} />}
       {footnote && (
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           {footnote}
         </Typography.Text>
       )}
+      <div className="kpi-spark-slot">{spark && <Sparkline values={spark} label={title} />}</div>
     </Card>
   );
 }
