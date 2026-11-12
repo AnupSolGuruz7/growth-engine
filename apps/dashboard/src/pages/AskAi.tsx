@@ -2,6 +2,7 @@ import { MessageOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons';
 import { Button, Card, Empty, Input, List, Space, Tag, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { AskTurn, ConversationDto } from '@growthos/shared-types';
 import { api } from '../api';
 import { AiError, AiMarkdown, AiSetupCard, Thinking, modelLabel, useAiStatus } from '../components/ai/AiBits';
@@ -73,6 +74,17 @@ export function AskAiPage() {
   useEffect(() => {
     setConversationId(undefined);
   }, [site?.id]);
+  // a question handed over from the home dashboard: ask it once, then clear it from history
+  const location = useLocation();
+  const navigate = useNavigate();
+  const handed = (location.state as { question?: string } | null)?.question;
+  useEffect(() => {
+    if (handed && site && status.data?.configured) {
+      ask.mutate(handed);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handed, site?.id, status.data?.configured]);
 
   if (!site) return null;
   const send = (q: string) => q.trim().length > 1 && !ask.isPending && ask.mutate(q.trim());

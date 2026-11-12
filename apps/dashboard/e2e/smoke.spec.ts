@@ -11,7 +11,7 @@ test('overview loads seeded data', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   const visitors = page.getByTestId('kpi-visitors').locator('.kpi-value');
   await expect(visitors).toHaveText(/^[1-9][\d,.\s]*$/, { timeout: 15_000 });
   await expect(page.getByTestId('kpi-sessions').locator('.kpi-value')).toHaveText(/^[1-9]/);

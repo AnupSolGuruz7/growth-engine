@@ -35,7 +35,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Analytics',
     items: [
-      { key: '/', icon: <BarChartOutlined />, label: 'Overview', dated: true },
+      { key: '/', icon: <BarChartOutlined />, label: 'Dashboard', dated: true },
       { key: '/realtime', icon: <ThunderboltOutlined />, label: 'Realtime' },
       { key: '/pages', icon: <FileTextOutlined />, label: 'Pages', dated: true },
       { key: '/sources', icon: <GlobalOutlined />, label: 'Sources', dated: true },

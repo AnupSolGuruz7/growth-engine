@@ -63,3 +63,9 @@ export function timeAgo(iso: string | null): string {
   if (s < 86400) return `${Math.round(s / 3600)} h ago`;
   return new Date(iso).toLocaleString();
 }
+
+/** The equally long period that ends the day before `from` (same rule as the API's compare). */
+export function previousRange(from: string, to: string): { from: string; to: string } {
+  const days = Math.round((Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 86_400_000) + 1;
+  return { from: addDays(from, -days), to: addDays(from, -1) };
+}

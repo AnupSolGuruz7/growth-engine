@@ -1,6 +1,7 @@
 import { ArrowDownOutlined, ArrowUpOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { Card, Skeleton, Tooltip, Typography } from 'antd';
 import { viz } from '../theme';
+import { Sparkline } from './home/HomeCards';
 
 interface Props {
   title: string;
@@ -12,10 +13,12 @@ interface Props {
   hint?: string;
   footnote?: string;
   loading?: boolean;
+  /** Daily values for a trend sparkline. */
+  spark?: number[];
 }
 
 /** Stat tile: one headline number, optional change vs the previous period (arrow + text, never colour alone). */
-export function KpiCard({ title, value, format, previous, lowerIsBetter, hint, footnote, loading }: Props) {
+export function KpiCard({ title, value, format, previous, lowerIsBetter, hint, footnote, loading, spark }: Props) {
   let delta: { pct: number; up: boolean; good: boolean } | null = null;
   if (value !== undefined && previous !== undefined && previous !== null && previous > 0) {
     const pct = (value - previous) / previous;
@@ -44,6 +47,7 @@ export function KpiCard({ title, value, format, previous, lowerIsBetter, hint, f
           )}
         </div>
       )}
+      {spark && <Sparkline values={spark} label={title} />}
       {footnote && (
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           {footnote}
