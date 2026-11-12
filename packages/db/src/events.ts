@@ -140,7 +140,7 @@ export async function recordBotDrops(db: Db, site: SiteRef, reason: string, coun
 export async function deleteSiteData(db: Db, siteId: string): Promise<void> {
   for (const t of [
     'events', 'sessions', 'dirty_visitor_days', 'dirty_site_days', 'agg_daily_site', 'agg_daily_page',
-    'agg_daily_source', 'agg_daily_event', 'bot_drops', 'seo_audits',
+    'agg_daily_source', 'agg_daily_event', 'bot_drops', 'seo_audits', 'suggestion_runs', 'ai_conversations', // ai_calls / ai_tool_calls are the audit log: kept
   ]) {
     await db.query(`DELETE FROM ${t} WHERE site_id = $1`, [siteId]);
   }

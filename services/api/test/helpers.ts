@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import IORedis from 'ioredis';
 import { freshTestDataSource, loadEnv } from '@growthos/db';
 import type { DataSource } from 'typeorm';
+import type { LlmProvider } from '../src/ai/llm';
 import { createApp } from '../src/app.factory';
 import type { AppConfig } from '../src/config';
 
@@ -17,7 +18,7 @@ export interface TestContext {
 }
 
 /** Fresh test database + flushed test Redis + a running app pointed at both. */
-export async function setupTestApp(overrides: Partial<AppConfig> = {}): Promise<TestContext> {
+export async function setupTestApp(overrides: Partial<AppConfig> = {}, deps: { llm?: LlmProvider | null } = { llm: null }): Promise<TestContext> {
   loadEnv();
   const dbUrl = process.env.TEST_DATABASE_URL!;
   const redisUrl = process.env.TEST_REDIS_URL ?? 'redis://localhost:6379/1';
@@ -37,7 +38,7 @@ export async function setupTestApp(overrides: Partial<AppConfig> = {}): Promise<
     rateLimitSitePerMin: 10_000,
     publicApiUrl: 'https://api.test',
     ...overrides,
-  });
+  }, deps);
   await app.init();
   return {
     app,

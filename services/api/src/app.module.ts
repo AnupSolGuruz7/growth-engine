@@ -3,6 +3,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LoggerModule } from 'nestjs-pino';
 import { dataSourceOptions } from '@growthos/db';
+import { AiModule } from './ai/ai.module';
+import type { LlmProvider } from './ai/llm';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { DevKeyGuard } from './common/dev-key.guard';
 import { RedisService } from './common/redis';
@@ -22,12 +24,14 @@ import { SitesService } from './sites/sites.service';
 
 @Module({})
 export class AppModule {
-  static forRoot(cfg: AppConfig): DynamicModule {
+  /** deps.llm overrides the AI provider (tests); undefined = from config. */
+  static forRoot(cfg: AppConfig, deps: { llm?: LlmProvider | null } = {}): DynamicModule {
     const shared = [
       { provide: APP_CONFIG, useValue: cfg },
       RedisService,
       SiteCache,
       SitesService,
+      SeoService,
     ];
     return {
       module: AppModule,
@@ -47,12 +51,12 @@ export class AppModule {
         }),
         TypeOrmModule.forRoot({ ...dataSourceOptions(cfg.databaseUrl), migrationsRun: cfg.migrationsRun }),
         AnalyticsModule,
+        AiModule.forRoot(cfg, deps.llm),
       ],
       controllers: [HealthController, IngestController, SitesController, MetricsController, SdkController, SeoController],
       providers: [
         ...shared,
         IngestService,
-        SeoService,
         RateLimiter,
         MetricsService,
         { provide: APP_GUARD, useClass: DevKeyGuard },

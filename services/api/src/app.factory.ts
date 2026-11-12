@@ -3,13 +3,14 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
 import { Logger } from 'nestjs-pino';
 import { MAX_BATCH_BYTES } from '@growthos/shared-types';
+import type { LlmProvider } from './ai/llm';
 import { AppModule } from './app.module';
 import { loadConfig, type AppConfig } from './config';
 
 /** Builds the configured Nest app. Shared by main.ts and the e2e tests. */
-export async function createApp(overrides: Partial<AppConfig> = {}): Promise<NestExpressApplication> {
+export async function createApp(overrides: Partial<AppConfig> = {}, deps: { llm?: LlmProvider | null } = {}): Promise<NestExpressApplication> {
   const cfg = loadConfig(overrides);
-  const app = await NestFactory.create<NestExpressApplication>(AppModule.forRoot(cfg), {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule.forRoot(cfg, deps), {
     bodyParser: false,
     bufferLogs: true,
   });

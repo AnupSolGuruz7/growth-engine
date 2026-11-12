@@ -13,6 +13,11 @@ export interface AppConfig {
   rateLimitIpPerMin: number;
   migrationsRun: boolean;
   sdkFile: string | null;
+  /** Claude API key; AI features are disabled (503 ai_not_configured) without it. */
+  anthropicApiKey: string | null;
+  aiModel: string;
+  aiMonthlyBudgetUsd: number;
+  aiAskDailyLimit: number;
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
@@ -39,6 +44,10 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     rateLimitIpPerMin: num('RATE_LIMIT_IP_PER_MIN', 120),
     migrationsRun: process.env.MIGRATIONS_RUN === 'true',
     sdkFile: process.env.SDK_FILE ?? null,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY || null,
+    aiModel: process.env.AI_MODEL || 'claude-opus-5-5',
+    aiMonthlyBudgetUsd: num('AI_MONTHLY_BUDGET_USD', 20),
+    aiAskDailyLimit: num('AI_ASK_DAILY_LIMIT', 50),
     ...overrides,
   };
   if (!cfg.databaseUrl) throw new Error('DATABASE_URL is required');
