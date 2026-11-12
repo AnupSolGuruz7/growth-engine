@@ -55,21 +55,21 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
 ];
 const ALL = NAV_GROUPS.flatMap((g) => g.items);
 
-function Brand() {
+function Brand({ collapsed }: { collapsed?: boolean }) {
   return (
-    <Link to="/" className="brand" aria-label="GrowthOS home">
+    <Link to="/" className={`brand ${collapsed ? 'collapsed' : ''}`} aria-label="GrowthOS home">
       <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden>
-        <rect width="26" height="26" rx="7" fill="#2a78d6" />
+        <rect width="26" height="26" rx="13" fill="#1ABB9C" />
         <rect x="6" y="14" width="3.2" height="6" rx="1.2" fill="#fff" opacity="0.7" />
         <rect x="11.4" y="10" width="3.2" height="10" rx="1.2" fill="#fff" opacity="0.85" />
         <rect x="16.8" y="6" width="3.2" height="14" rx="1.2" fill="#fff" />
       </svg>
-      <span>GrowthOS</span>
+      {!collapsed && <span>GrowthOS</span>}
     </Link>
   );
 }
 
-function Nav({ onNavigate }: { onNavigate?: () => void }) {
+function Nav({ onNavigate, collapsed, dark = true }: { onNavigate?: () => void; collapsed?: boolean; dark?: boolean }) {
   const { pathname } = useLocation();
   const items: MenuProps['items'] = NAV_GROUPS.map((g) => ({
     type: 'group' as const,
@@ -77,7 +77,16 @@ function Nav({ onNavigate }: { onNavigate?: () => void }) {
     label: g.title,
     children: g.items.map((n) => ({ key: n.key, icon: n.icon, label: <Link to={n.key} onClick={onNavigate}>{n.label}</Link> })),
   }));
-  return <Menu mode="inline" selectedKeys={[pathname]} className="side-nav" items={items} />;
+  return (
+    <Menu
+      mode="inline"
+      theme={dark ? 'dark' : 'light'}
+      inlineCollapsed={collapsed}
+      selectedKeys={[pathname]}
+      className="side-nav"
+      items={collapsed ? NAV_GROUPS.flatMap((g) => g.items).map((n) => ({ key: n.key, icon: n.icon, label: <Link to={n.key}>{n.label}</Link> })) : items}
+    />
+  );
 }
 
 function DateControls({ compact }: { compact?: boolean }) {
@@ -156,6 +165,23 @@ function SiteSwitcher({ onAdd, compact }: { onAdd: () => void; compact?: boolean
   );
 }
 
+/** Sidebar block naming the site being viewed (like a profile block in admin themes). */
+function SiteBlock() {
+  const { site, detail } = useCurrentSite();
+  if (!site) return null;
+  const live = !!detail.data?.last_event_received_at && Date.now() - Date.parse(detail.data.last_event_received_at) < 86_400_000;
+  return (
+    <div className="site-block">
+      <div className="site-avatar" aria-hidden>{site.name.slice(0, 1).toUpperCase()}</div>
+      <div style={{ minWidth: 0 }}>
+        <div className="site-block-kicker">Viewing</div>
+        <div className="site-block-name">{site.name}</div>
+        <div className="site-block-status"><span className={`dot ${live ? 'on' : ''}`} aria-hidden /> {live ? 'Receiving events' : 'No events in 24 h'}</div>
+      </div>
+    </div>
+  );
+}
+
 export function AppLayout() {
   const [adding, setAdding] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -164,26 +190,40 @@ export function AppLayout() {
   const { pathname } = useLocation();
   const current = ALL.find((n) => n.key === pathname);
   const dated = !!current?.dated;
+  const { navCollapsed, setNavCollapsed } = useDashboard();
 
   useEffect(() => {
     document.title = current ? `${current.label} · GrowthOS` : 'GrowthOS';
   }, [current]);
 
+  const toggle = () => (desktop ? setNavCollapsed(!navCollapsed) : setMenuOpen(true));
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       {desktop && (
-        <Layout.Sider width={232} theme="light" className="app-sider">
-          <Brand />
-          <Nav />
+        <Layout.Sider width={232} collapsedWidth={72} collapsed={navCollapsed} trigger={null} className="app-sider">
+          <Brand collapsed={navCollapsed} />
+          {!navCollapsed && <SiteBlock />}
+          <Nav collapsed={navCollapsed} />
         </Layout.Sider>
       )}
-      <Drawer open={!desktop && menuOpen} onClose={() => setMenuOpen(false)} placement="left" width={260} title={<Brand />} styles={{ body: { padding: 8 } }}>
+      <Drawer
+        open={!desktop && menuOpen}
+        onClose={() => setMenuOpen(false)}
+        placement="left"
+        width={260}
+        closable={false}
+        className="nav-drawer"
+        styles={{ body: { padding: 0, background: '#2A3F54' } }}
+      >
+        <Brand />
+        <SiteBlock />
         <Nav onNavigate={() => setMenuOpen(false)} />
       </Drawer>
       <Layout>
         <Layout.Header className={`app-header ${desktop ? '' : 'mobile'}`}>
           <div className="header-row">
-            {!desktop && <Button type="text" icon={<MenuOutlined />} onClick={() => setMenuOpen(true)} aria-label="Open navigation" />}
+            <Button type="text" icon={<MenuOutlined />} onClick={toggle} aria-label={desktop ? (navCollapsed ? 'Expand sidebar' : 'Collapse sidebar') : 'Open navigation'} className="hamburger" />
             <SiteSwitcher onAdd={() => setAdding(true)} compact={!desktop} />
             {desktop && <div style={{ flex: 1 }} />}
             {desktop && dated && <DateControls />}
@@ -197,6 +237,7 @@ export function AppLayout() {
         <Layout.Content className="app-content">
           <Outlet />
         </Layout.Content>
+        <Layout.Footer className="app-footer">GrowthOS · privacy-friendly analytics, SEO and growth insights</Layout.Footer>
       </Layout>
       <AddSiteModal open={adding} onClose={() => setAdding(false)} />
     </Layout>

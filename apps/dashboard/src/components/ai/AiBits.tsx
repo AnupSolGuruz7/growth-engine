@@ -15,7 +15,7 @@ export function AiSetupCard() {
   return (
     <div className="empty-state" data-testid="ai-setup">
       <Space align="start" size="middle">
-        <KeyOutlined style={{ fontSize: 28, color: '#2a78d6', marginTop: 4 }} />
+        <KeyOutlined style={{ fontSize: 28, color: '#169F85', marginTop: 4 }} />
         <div>
           <Typography.Title level={4} style={{ marginTop: 0 }}>Connect an AI provider to turn on AI insights</Typography.Title>
           <Typography.Paragraph>

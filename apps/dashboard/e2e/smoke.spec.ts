@@ -17,7 +17,8 @@ test('overview loads seeded data', async ({ page }) => {
   await expect(page.getByTestId('kpi-sessions').locator('.kpi-value')).toHaveText(/^[1-9]/);
   await expect(page.getByTestId('kpi-bounce-rate').locator('.kpi-value')).toHaveText(/%$/);
   // the previous-period line can be flat (zero height), so check the selected period's line
-  await expect(page.locator('path.recharts-line-curve[name="Selected period"]')).toBeVisible();
+  // area chart: the selected period is drawn last (the previous period can be flat / zero height)
+  await expect(page.locator('path.recharts-area-curve').last()).toBeVisible();
   await expect(page.getByText('Previous period', { exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });

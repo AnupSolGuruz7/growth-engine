@@ -8,6 +8,8 @@ interface DashboardState {
   preset: PresetKey;
   custom: { from: string; to: string } | null;
   compare: boolean;
+  navCollapsed: boolean;
+  setNavCollapsed(v: boolean): void;
   setSite(id: string): void;
   setPreset(p: Exclude<PresetKey, 'custom'>): void;
   setCustom(from: string, to: string): void;
@@ -21,6 +23,8 @@ export const useDashboard = create<DashboardState>()(
       preset: '30d',
       custom: null,
       compare: true,
+      navCollapsed: false,
+      setNavCollapsed: (navCollapsed) => set({ navCollapsed }),
       setSite: (siteId) => set({ siteId }),
       setPreset: (preset) => set({ preset, custom: null }),
       setCustom: (from, to) => set({ preset: 'custom', custom: { from, to } }),

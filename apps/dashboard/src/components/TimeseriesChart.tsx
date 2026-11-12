@@ -1,6 +1,6 @@
 import { Segmented } from 'antd';
 import { useState } from 'react';
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { TimeseriesPoint } from '@growthos/shared-types';
 import { fmtDate, fmtNumber, fmtPct } from '../dates';
 import { viz } from '../theme';
@@ -40,7 +40,7 @@ export function TimeseriesChart({ current, previous }: Props) {
       </div>
       <div style={{ width: '100%', height: 280 }} role="img" aria-label={`${label} per day`}>
         <ResponsiveContainer>
-          <LineChart data={rows} margin={{ top: 8, right: 28, bottom: 0, left: 0 }}>
+          <AreaChart data={rows} margin={{ top: 8, right: 28, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke={viz.grid} />
             <XAxis
               dataKey="date"
@@ -91,28 +91,42 @@ export function TimeseriesChart({ current, previous }: Props) {
                 formatter={(v) => <span style={{ color: viz.textSecondary, fontSize: 12 }}>{v}</span>}
               />
             )}
+            <defs>
+              <linearGradient id="fill-current" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={viz.series1} stopOpacity={0.35} />
+                <stop offset="100%" stopColor={viz.series1} stopOpacity={0.04} />
+              </linearGradient>
+              <linearGradient id="fill-previous" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={viz.series2} stopOpacity={0.16} />
+                <stop offset="100%" stopColor={viz.series2} stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
             {previous && (
-              <Line
+              <Area
+                type="monotone"
                 name="Previous period"
                 dataKey="previous"
                 stroke={viz.series2}
                 strokeWidth={2}
                 strokeDasharray="5 4"
+                fill="url(#fill-previous)"
                 dot={false}
                 activeDot={{ r: 4, strokeWidth: 2, stroke: viz.surface }}
                 isAnimationActive={false}
               />
             )}
-            <Line
+            <Area
+              type="monotone"
               name={previous ? 'Selected period' : label}
               dataKey="current"
               stroke={viz.series1}
               strokeWidth={2}
+              fill="url(#fill-current)"
               dot={rows.length <= 2 ? { r: 4 } : false}
               activeDot={{ r: 5, strokeWidth: 2, stroke: viz.surface }}
               isAnimationActive={false}
             />
-          </LineChart>
+          </AreaChart>
         </ResponsiveContainer>
       </div>
     </div>

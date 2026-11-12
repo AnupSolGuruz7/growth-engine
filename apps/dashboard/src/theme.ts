@@ -1,30 +1,70 @@
 import type { ThemeConfig } from 'antd';
 
 /**
- * Chart roles (validated reference palette: categorical slots 1–2, status good/critical).
- * Text never takes a series colour; marks carry identity, ink carries values.
+ * Admin theme: dark navy sidebar, teal accent, slate text, light grey canvas, white panels.
+ * Chart series colours are validated (dataviz validator, light surface):
+ *   series1 teal + series2 slate blue pass every check;
+ *   series1–3 (+ orange) pass all-pairs for donuts (orange is < 3:1, so donuts always carry labels).
+ * Status colours (good/critical) are reserved and never used as series.
  */
+export const brand = {
+  navy: '#2A3F54',
+  navyDark: '#1F3142',
+  navyText: '#E7E7E7',
+  teal: '#169F85',
+  tealBright: '#1ABB9C',
+  canvas: '#F7F7F7',
+  header: '#EDEDED',
+  panelBorder: '#E6E9ED',
+  text: '#5A738E',
+  heading: '#2A3F54',
+  muted: '#8A9AAD',
+};
+
 export const viz = {
-  series1: '#2a78d6', // current period / the single series
-  series2: '#eb6834', // previous period (always dashed + legend, never colour alone)
-  barTrack: '#eef3fb',
-  grid: '#ecebe8',
-  axis: '#8a8984',
-  textPrimary: '#0b0b0b',
-  textSecondary: '#52514e',
-  good: '#0ca30c',
-  critical: '#d03b3b',
-  surface: '#fcfcfb',
+  series1: '#169F85', // current period / the single series
+  series2: '#3E6FA8', // previous period (dashed + legend)
+  series3: '#D9822B', // third category (donuts only, always labelled)
+  other: '#B9C2CB', // "other / unknown" bucket — neutral, not a category hue
+  barTrack: '#E8F5F2',
+  grid: '#EEF1F4',
+  axis: '#9AA8B6',
+  textPrimary: '#2A3F54',
+  textSecondary: '#73879C',
+  good: '#0A8A0A',
+  critical: '#C0392B',
+  surface: '#FFFFFF',
 };
 
 export const antdTheme: ThemeConfig = {
   token: {
-    colorPrimary: viz.series1,
-    borderRadius: 8,
-    fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    colorPrimary: brand.teal,
+    colorLink: brand.teal,
+    colorInfo: brand.teal,
+    colorText: '#3F5268',
+    colorTextSecondary: '#73879C',
+    colorTextHeading: brand.heading,
+    colorBorderSecondary: brand.panelBorder,
+    colorBgLayout: brand.canvas,
+    borderRadius: 4,
+    fontFamily: '"Helvetica Neue", Roboto, Arial, "Segoe UI", system-ui, sans-serif',
   },
   components: {
-    Layout: { headerBg: '#ffffff', siderBg: '#ffffff', bodyBg: '#f6f7f9' },
-    Card: { paddingLG: 20 },
+    Layout: { headerBg: brand.header, siderBg: brand.navy, bodyBg: brand.canvas, triggerBg: brand.navyDark },
+    Menu: {
+      darkItemBg: brand.navy,
+      darkSubMenuItemBg: brand.navy,
+      darkItemColor: brand.navyText,
+      darkItemHoverBg: 'rgba(255,255,255,0.06)',
+      darkItemHoverColor: '#FFFFFF',
+      darkItemSelectedBg: '#35495E',
+      darkItemSelectedColor: '#FFFFFF',
+      darkGroupTitleColor: '#B7C4D0',
+      itemBorderRadius: 0,
+      itemMarginInline: 0,
+    },
+    Card: { headerFontSize: 17, paddingLG: 18, headerBg: 'transparent' },
+    Segmented: { itemSelectedBg: '#FFFFFF' },
+    Tabs: { inkBarColor: brand.teal, itemSelectedColor: brand.teal },
   },
 };
