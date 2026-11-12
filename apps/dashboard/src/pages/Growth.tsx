@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { EvidenceItem, SuggestionDto, SuggestionStatus } from '@growthos/shared-types';
 import { api, ApiError } from '../api';
-import { AiError, AiSetupCard, BudgetMeter, Thinking, useAiStatus } from '../components/ai/AiBits';
+import { AiError, AiSetupCard, BudgetMeter, Thinking, modelLabel, useAiStatus } from '../components/ai/AiBits';
 import { fmtNumber, timeAgo } from '../dates';
 import { useCurrentSite } from '../hooks';
 
@@ -158,7 +158,7 @@ export function GrowthPage() {
         <>
           <AiError error={generate.error instanceof ApiError ? generate.error : null} />
           {running && (
-            <Alert style={{ marginBottom: 16 }} type="info" showIcon message={<Thinking label="Claude is reviewing the last 28 days of analytics and your latest SEO audit… this usually takes under a minute." />} />
+            <Alert style={{ marginBottom: 16 }} type="info" showIcon message={<Thinking label={`${modelLabel(status.data)} is reviewing the last 28 days of analytics and your latest SEO audit… this usually takes under a minute.`} />} />
           )}
           {run?.status === 'failed' && <Alert style={{ marginBottom: 16 }} type="error" showIcon message="The last run failed" description={run.error} />}
           {run?.status === 'completed' && run.dropped.length > 0 && (

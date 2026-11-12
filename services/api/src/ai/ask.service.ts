@@ -162,17 +162,18 @@ export class AskService {
     const llm = this.usage.provider();
     await this.usage.assertAllowed(site, 'ask');
 
-    let conv: { id: string; messages: unknown[]; transcript: AskTurn[] } | undefined;
+    let conv: { id: string; messages: unknown[]; transcript: AskTurn[]; provider: string | null } | undefined;
     if (input.conversation_id) {
       [conv] = await this.ds.query(
-        `SELECT id, messages, transcript FROM ai_conversations WHERE id = $1 AND site_id = $2 AND organization_id = $3`,
+        `SELECT id, messages, transcript, provider FROM ai_conversations WHERE id = $1 AND site_id = $2 AND organization_id = $3`,
         [input.conversation_id, site.id, t.organizationId],
       );
       if (!conv) throw new NotFoundException({ error: 'conversation_not_found', message: 'Conversation not found' });
     } else {
       [conv] = await this.ds.query(
-        `INSERT INTO ai_conversations (organization_id, site_id, title) VALUES ($1, $2, $3) RETURNING id, messages, transcript`,
-        [site.organization_id, site.id, input.question.slice(0, 120)],
+        `INSERT INTO ai_conversations (organization_id, site_id, title, provider) VALUES ($1, $2, $3, $4)
+         RETURNING id, messages, transcript, provider`,
+        [site.organization_id, site.id, input.question.slice(0, 120), llm.name],
       );
     }
     const c = conv!;
@@ -185,7 +186,8 @@ export class AskService {
     try {
       const res = await llm.toolLoop({
         system: ASK_SYSTEM,
-        history: c.messages,
+        // histories are provider-specific: after a provider switch, continue with a fresh model history
+        history: c.provider === llm.name ? c.messages : [],
         userMessage,
         tools: ASK_TOOLS,
         execute: (name, args) => this.executeTool(t, site.id, name, args),
@@ -199,9 +201,10 @@ export class AskService {
         { role: 'user', text: input.question, at: now },
         { role: 'assistant', text: res.text || '(no answer)', at: now, tools: res.toolCalls.map((x) => ({ name: x.name, input: x.input })) },
       ];
-      await this.ds.query(`UPDATE ai_conversations SET messages = $2, transcript = $3, updated_at = now() WHERE id = $1`, [
-        c.id, JSON.stringify(res.history), JSON.stringify(transcript),
-      ]);
+      await this.ds.query(
+        `UPDATE ai_conversations SET messages = $2, transcript = $3, provider = $4, updated_at = now() WHERE id = $1`,
+        [c.id, JSON.stringify(res.history), JSON.stringify(transcript), llm.name],
+      );
       await this.usage.recordTools(site, c.id, res.toolCalls);
       await this.usage.record(site, 'ask', usage, res.refused ? 'refused' : 'ok', Date.now() - started, c.id);
       return this.conversation(t, c.id);

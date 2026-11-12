@@ -122,6 +122,17 @@ export async function sessionizeBatch(ds: DataSource, opts: ProcessingOptions = 
     for (const k of keys) {
       await rebuildVisitorDay(m, k, timeout);
     }
+    // Mark the affected site-days once, in a fixed order, so concurrent batches (several workers, or
+    // a seed script next to the worker) always take these row locks in the same order: no deadlock.
+    const days = [...new Set(keys.map((k) => `${k.site_id}|${k.local_date}`))].sort();
+    if (days.length) {
+      await m.query(
+        `INSERT INTO dirty_site_days (site_id, local_date)
+         SELECT split_part(d, '|', 1)::uuid, split_part(d, '|', 2)::date FROM unnest($1::text[]) AS d ORDER BY d
+         ON CONFLICT (site_id, local_date) DO UPDATE SET marked_at = now()`,
+        [days],
+      );
+    }
     return keys.length;
   });
 }
@@ -167,11 +178,20 @@ async function rebuildVisitorDay(
   await m.query(`DELETE FROM dirty_visitor_days WHERE site_id = $1 AND visitor_key = $2 AND local_date = $3`, [
     k.site_id, k.visitor_key, k.local_date,
   ]);
-  await m.query(
-    `INSERT INTO dirty_site_days (site_id, local_date) VALUES ($1, $2)
-     ON CONFLICT (site_id, local_date) DO UPDATE SET marked_at = now()`,
-    [k.site_id, k.local_date],
-  );
+}
+
+/** Postgres deadlock / serialization failure: the transaction rolled back and can simply be re-run. */
+const isRetryable = (e: unknown) => ['40P01', '40001'].includes((e as { driverError?: { code?: string }; code?: string }).driverError?.code ?? (e as { code?: string }).code ?? '');
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (!isRetryable(e) || i >= attempts) throw e;
+      await new Promise((r) => setTimeout(r, 50 * i + Math.random() * 100));
+    }
+  }
 }
 
 /** Recomputes all four rollups for dirty site days. Idempotent: delete + insert per (site, day). */
@@ -262,8 +282,11 @@ export interface ProcessResult {
 export async function processPending(ds: DataSource, opts: ProcessingOptions = {}): Promise<ProcessResult> {
   let sessionized = 0;
   let rolledUp = 0;
-  for (let n = await sessionizeBatch(ds, opts); n > 0; n = await sessionizeBatch(ds, opts)) sessionized += n;
-  for (let n = await rollupBatch(ds, opts); n > 0; n = await rollupBatch(ds, opts)) rolledUp += n;
+  // batches are idempotent, so a deadlock/serialization failure just re-runs the batch
+  const sess = () => withRetry(() => sessionizeBatch(ds, opts));
+  const roll = () => withRetry(() => rollupBatch(ds, opts));
+  for (let n = await sess(); n > 0; n = await sess()) sessionized += n;
+  for (let n = await roll(); n > 0; n = await roll()) rolledUp += n;
   return { sessionized, rolledUp };
 }
 

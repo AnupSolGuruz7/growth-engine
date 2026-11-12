@@ -221,9 +221,17 @@ Open **SEO audit** in the dashboard and click **Run audit**. The worker crawls t
 
 Search Console (spec §7.2) is not connected yet.
 
-## AI insights (Claude)
+## AI insights
 
-Add `ANTHROPIC_API_KEY` to `.env` and restart the API. Without it the AI pages show setup steps, and the endpoints answer `503 ai_not_configured`. The model is Claude Opus 5.5 (`AI_MODEL`), behind a provider-agnostic `LlmProvider` interface (spec §8.4).
+AI runs behind a provider-agnostic `LlmProvider` interface (spec §8.4). Set one key in `.env` and restart the API. Without one, the AI pages show setup steps and the endpoints answer `503 ai_not_configured`.
+
+| `AI_PROVIDER` | Key | Default model | Notes |
+|---|---|---|---|
+| `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-5-5` | Native structured output, prompt caching, refusal fallbacks |
+| `groq` | `GROQ_API_KEY` (`gsk_…`) | `openai/gpt-oss-120b` | OpenAI-compatible API. Free-tier keys are limited to about 8,000 tokens per minute, so a long Ask AI answer can take up to a minute while the server waits out the limit |
+| `xai` | `XAI_API_KEY` (`xai-…`) | `grok-4` | OpenAI-compatible API (Grok) |
+
+`AI_PROVIDER` defaults to the first provider that has a key. `AI_MODEL` overrides the model, and `AI_PRICE_INPUT_PER_MTOK` / `AI_PRICE_OUTPUT_PER_MTOK` set prices for the budget meter if your model or plan differs. Ask AI conversations remember which provider wrote them; after a switch they continue with a fresh model history, and the visible transcript is kept.
 
 - **Growth suggestions:**
   - **What it reads:** the last 28 days against the 28 before (overview, landing pages, channels, campaigns, referrers, events, which pages custom events happen on, devices) plus the latest SEO audit's top findings. Every number is a fact with an ID (for example `landing:/pricing.bounce_rate`).
@@ -239,9 +247,10 @@ Add `ANTHROPIC_API_KEY` to `.env` and restart the API. Without it the AI pages s
   - **Budget:** a monthly spend cap per site (`AI_MONTHLY_BUDGET_USD`, default $20) and a daily Ask AI limit (`AI_ASK_DAILY_LIMIT`, default 50), both computed from logged token usage.
   - **Audit log:** every model call and tool call is recorded (`ai_calls`, `ai_tool_calls`). The log is kept even when a site's data is deleted.
   - **Prompt injection:** website and visitor text (page content, titles, event names) is passed inside tagged data blocks that the instructions say never to obey.
-  - **Refusals:** if Claude declines a request, the server can retry it on a fallback model (`server-side-fallback`, default routing).
+  - **Refusals:** on Claude, a declined request can be retried on a fallback model (`server-side-fallback`, default routing).
+  - **Rate limits:** on Groq and xAI, rate limits (429) are waited out using the reset time the provider sends. Output that doesn't match the expected format gets one corrective retry.
 
-**Rough costs at Opus 5.5 prices** (the dashboard shows actual spend):
+**Rough costs at Claude Opus 5.5 prices** (the dashboard shows actual spend). On Groq the same work costs well under a cent per call:
 
 | Action | Cost |
 |---|---|

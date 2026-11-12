@@ -196,7 +196,14 @@ describe('AI insights (e2e, scripted provider)', () => {
        VALUES ($1, $2, $3, 'https://shop.example.com/pricing', 'on-page', 'title_missing', 'high', 'Missing <title>', '{"title":null}', 'e', 'f', 0.9, 1, 3, 'fp') RETURNING id`,
       [audit.id, site.organization_id, site.id],
     );
-    fake.onStructured = () => ({ drafts: [{ field: 'title', value: ' Pricing plans from 9 USD | Shop ', note: 'Leads with the topic.' }], caution: null });
+    // the model also returns an off-target field: only the finding's own field (title) is kept
+    fake.onStructured = () => ({
+      drafts: [
+        { field: 'title', value: ' Pricing plans from 9 USD | Shop ', note: 'Leads with the topic.' },
+        { field: 'structured_data', value: '{"@type":"WebSite"}', note: 'extra' },
+      ],
+      caution: null,
+    });
     const before = fake.structuredCalls.length;
     const d = await api().post(`/v1/seo/findings/${finding.id}/draft`).set(key()).send({}).expect(201);
     expect(d.body.drafts).toEqual([{ field: 'title', value: 'Pricing plans from 9 USD | Shop', note: 'Leads with the topic.', length: 31 }]);

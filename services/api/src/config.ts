@@ -15,7 +15,15 @@ export interface AppConfig {
   sdkFile: string | null;
   /** Claude API key; AI features are disabled (503 ai_not_configured) without it. */
   anthropicApiKey: string | null;
+  groqApiKey: string | null;
+  xaiApiKey: string | null;
+  /** anthropic | groq | xai; null when no key is configured. */
+  aiProvider: 'anthropic' | 'groq' | 'xai' | null;
+  /** Model id; empty = the provider default (claude-opus-5-5, openai/gpt-oss-120b, grok-4). */
   aiModel: string;
+  /** Optional price override in USD per million tokens (for budgets with models not in the price table). */
+  aiPriceInputPerMTok: number | null;
+  aiPriceOutputPerMTok: number | null;
   aiMonthlyBudgetUsd: number;
   aiAskDailyLimit: number;
 }
@@ -25,6 +33,16 @@ export const APP_CONFIG = Symbol('APP_CONFIG');
 function num(name: string, fallback: number): number {
   const v = Number(process.env[name]);
   return Number.isFinite(v) && v > 0 ? v : fallback;
+}
+
+/** AI_PROVIDER wins; otherwise the first provider with a key (Anthropic, then Groq, then xAI). */
+function pickProvider(): AppConfig['aiProvider'] {
+  const explicit = process.env.AI_PROVIDER?.toLowerCase();
+  if (explicit === 'anthropic' || explicit === 'groq' || explicit === 'xai') return explicit;
+  if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
+  if (process.env.GROQ_API_KEY) return 'groq';
+  if (process.env.XAI_API_KEY) return 'xai';
+  return null;
 }
 
 /** Reads configuration from the environment (root .env is loaded first, real env vars win). */
@@ -45,7 +63,12 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     migrationsRun: process.env.MIGRATIONS_RUN === 'true',
     sdkFile: process.env.SDK_FILE ?? null,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY || null,
-    aiModel: process.env.AI_MODEL || 'claude-opus-5-5',
+    groqApiKey: process.env.GROQ_API_KEY || null,
+    xaiApiKey: process.env.XAI_API_KEY || null,
+    aiProvider: pickProvider(),
+    aiModel: process.env.AI_MODEL || '',
+    aiPriceInputPerMTok: process.env.AI_PRICE_INPUT_PER_MTOK ? Number(process.env.AI_PRICE_INPUT_PER_MTOK) : null,
+    aiPriceOutputPerMTok: process.env.AI_PRICE_OUTPUT_PER_MTOK ? Number(process.env.AI_PRICE_OUTPUT_PER_MTOK) : null,
     aiMonthlyBudgetUsd: num('AI_MONTHLY_BUDGET_USD', 20),
     aiAskDailyLimit: num('AI_ASK_DAILY_LIMIT', 50),
     ...overrides,

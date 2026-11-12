@@ -109,12 +109,24 @@ export function addUsage(a: LlmUsage, b: LlmUsage): LlmUsage {
   };
 }
 
-/** USD per million tokens. Unknown models are priced like Claude Opus 5.5 (conservative for budgets). */
+/**
+ * USD per million tokens. Unknown models are priced like Claude Opus 5.5 (conservative for budgets).
+ * Groq rows are approximate list prices (free-tier keys are not billed at all); override with
+ * AI_PRICE_INPUT_PER_MTOK / AI_PRICE_OUTPUT_PER_MTOK.
+ */
 const PRICES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
+  'openai/gpt-oss-120b': { input: 0.15, output: 0.75, cacheRead: 0.075, cacheWrite: 0 },
+  'openai/gpt-oss-20b': { input: 0.1, output: 0.5, cacheRead: 0.05, cacheWrite: 0 },
   'claude-opus-5-5': { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
   'claude-sonnet-5-5': { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5 },
   'claude-haiku-5-5': { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
 };
+
+/** Lets config override the price of the active model. */
+export function setPriceOverride(model: string, input: number | null, output: number | null): void {
+  if (input === null || output === null) return;
+  PRICES[model] = { input, output, cacheRead: input / 2, cacheWrite: input };
+}
 
 export function costUsd(u: LlmUsage): number {
   const p = PRICES[u.servedBy] ?? PRICES[u.model] ?? PRICES['claude-opus-5-5']!;

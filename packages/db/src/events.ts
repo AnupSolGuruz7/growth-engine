@@ -137,11 +137,18 @@ export async function recordBotDrops(db: Db, site: SiteRef, reason: string, coun
 }
 
 /** Removes all analytics data of a site (raw events, sessions, rollups, queues). */
-export async function deleteSiteData(db: Db, siteId: string): Promise<void> {
-  for (const t of [
-    'events', 'sessions', 'dirty_visitor_days', 'dirty_site_days', 'agg_daily_site', 'agg_daily_page',
-    'agg_daily_source', 'agg_daily_event', 'bot_drops', 'seo_audits', 'suggestion_runs', 'ai_conversations', // ai_calls / ai_tool_calls are the audit log: kept
-  ]) {
+const ANALYTICS_TABLES = [
+  'events', 'sessions', 'dirty_visitor_days', 'dirty_site_days', 'agg_daily_site', 'agg_daily_page',
+  'agg_daily_source', 'agg_daily_event', 'bot_drops',
+];
+
+/**
+ * Deletes a site's data. `analyticsOnly` resets traffic data but keeps SEO audits and AI
+ * suggestions/conversations (used by the demo reseed). ai_calls / ai_tool_calls are the audit
+ * log and are always kept.
+ */
+export async function deleteSiteData(db: Db, siteId: string, opts: { analyticsOnly?: boolean } = {}): Promise<void> {
+  for (const t of [...ANALYTICS_TABLES, ...(opts.analyticsOnly ? [] : ['seo_audits', 'suggestion_runs', 'ai_conversations'])]) {
     await db.query(`DELETE FROM ${t} WHERE site_id = $1`, [siteId]);
   }
 }

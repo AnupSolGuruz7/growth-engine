@@ -54,7 +54,7 @@ async function main() {
   const days = Number(process.argv[2] ?? 28);
   const ds = await createDataSource().initialize();
   const site = await seedDemoSite(ds);
-  await deleteSiteData(ds, site.id);
+  await deleteSiteData(ds, site.id, { analyticsOnly: true }); // keep SEO audits and AI history
   await ensurePartitions(ds, Math.ceil(days / 28) + 1, 2);
 
   const r = rng(42);

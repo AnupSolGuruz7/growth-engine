@@ -250,6 +250,11 @@ export class SuggestionsService {
 
   async list(t: TenantContext, siteId: string): Promise<SuggestionsResponse> {
     const site = await this.sites.getOwned(t, siteId);
+    // Read the run status BEFORE the suggestions: a run's suggestions commit together with its
+    // "completed" status, so a completed run read first guarantees its suggestions are visible.
+    // (The other order could return "completed" with no suggestions, and the dashboard stops polling.)
+    const [latest] = await this.ds.query(`SELECT id FROM suggestion_runs WHERE site_id = $1 ORDER BY created_at DESC LIMIT 1`, [site.id]);
+    const latestRun = latest ? await this.run(latest.id) : null;
     const rows = await this.ds.query(
       `SELECT * FROM suggestions WHERE site_id = $1
        ORDER BY CASE status WHEN 'new' THEN 0 WHEN 'accepted' THEN 1 WHEN 'done' THEN 2 ELSE 3 END,
@@ -257,9 +262,8 @@ export class SuggestionsService {
        LIMIT 200`,
       [site.id],
     );
-    const [latest] = await this.ds.query(`SELECT id FROM suggestion_runs WHERE site_id = $1 ORDER BY created_at DESC LIMIT 1`, [site.id]);
     const suggestions = await Promise.all(rows.map((r: Record<string, unknown>) => this.toDto(t, site.id, site.timezone, r)));
-    return { suggestions, latest_run: latest ? await this.run(latest.id) : null };
+    return { suggestions, latest_run: latestRun };
   }
 
   async setStatus(t: TenantContext, id: string, status: SuggestionStatus): Promise<SuggestionDto> {

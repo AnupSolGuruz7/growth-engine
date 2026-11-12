@@ -4,6 +4,7 @@ import { DataSource, EntitySchema, type DataSourceOptions } from 'typeorm';
 import { InitialSchema1762790400000 } from './migrations/1762790400000-InitialSchema';
 import { SeoAudit1762963200000 } from './migrations/1762963200000-SeoAudit';
 import { AiInsights1763049600000 } from './migrations/1763049600000-AiInsights';
+import { AiConversationProvider1763136000000 } from './migrations/1763136000000-AiConversationProvider';
 
 // node-pg defaults: DATE -> JS Date at local midnight (timezone bugs), BIGINT/NUMERIC -> string.
 // Analytics needs calendar dates as plain strings and counts as numbers.
@@ -57,7 +58,7 @@ export const SiteEntity = new EntitySchema<SiteRow>({
   },
 });
 
-export const MIGRATIONS = [InitialSchema1762790400000, SeoAudit1762963200000, AiInsights1763049600000];
+export const MIGRATIONS = [InitialSchema1762790400000, SeoAudit1762963200000, AiInsights1763049600000, AiConversationProvider1763136000000];
 
 export function dataSourceOptions(url: string | undefined = process.env.DATABASE_URL): DataSourceOptions {
   if (!url) throw new Error('DATABASE_URL is not set');

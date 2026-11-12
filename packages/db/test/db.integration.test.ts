@@ -71,4 +71,23 @@ describe('storage', () => {
     );
     expect(sessions).toEqual([{ visitor_key: 'v:vis-9', pageviews: 1, interactions: 1, is_bounce: false }]);
   });
+
+  it('two processors running at once do not deadlock and agree on the result', async () => {
+    // 600 visitors spread over 3 days: concurrent batches touch the same site-days
+    const many: NormalizedEvent[] = Array.from({ length: 600 }, (_, i) =>
+      ev(1000 + i, `2026-11-2${i % 3}T12:00:00Z`, { consent_state: 'pending', visitor_id: null, session_id: null, ephemeral_id: `load-${i}` }),
+    );
+    await insertEvents(ds, site, many);
+    const [a, b] = await Promise.all([processPending(ds, { batchSize: 25 }), processPending(ds, { batchSize: 25 })]);
+    expect(a.sessionized + b.sessionized).toBe(600);
+    // site timezone is America/New_York: 12:00 UTC is 07:00 the same local day
+    const rows = await ds.query(
+      `SELECT date, sessions FROM agg_daily_site WHERE date BETWEEN '2026-11-20' AND '2026-11-22' ORDER BY date`,
+    );
+    expect(rows).toEqual([
+      { date: '2026-11-20', sessions: 200 },
+      { date: '2026-11-21', sessions: 200 },
+      { date: '2026-11-22', sessions: 200 },
+    ]);
+  });
 });
