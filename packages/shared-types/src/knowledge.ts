@@ -54,6 +54,11 @@ export interface KnowledgeResponse {
   documents: KnowledgeDocumentDto[];
   /** Whether the server allows connecting sources (KNOWLEDGE_ALLOWED_ROOTS is set). */
   allowed_roots: string[];
+  /**
+   * Files in the folder that differ from the last sync (by modification time and path), or null when
+   * not checked (no source, sync running, folder unreadable). Hashes decide what a sync re-embeds.
+   */
+  pending_changes: { changed: number; added: number; removed: number } | null;
 }
 
 /** A retrieved passage. `cite` is the human-readable citation, e.g. "knowledge/brand-facts.md › Pricing". */

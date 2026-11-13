@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { DeviceDonut, MeterList, ProgressList, StatStrip } from '../components/home/Charts';
 import {
-  AskCard, GrowthCard, InsightsCard, KeyEventsCard, LiveNowCard, SeoHealthCard, computeInsights,
+  AskCard, GrowthCard, InsightsCard, KeyEventsCard, LiveNowCard, SearchKnowledgeCard, SeoHealthCard, computeInsights,
 } from '../components/home/HomeCards';
 import { ReportPage } from '../components/ReportPage';
 import { TimeseriesChart } from '../components/TimeseriesChart';
@@ -111,8 +111,9 @@ export function OverviewPage() {
         </Card>
       </div>
 
-      <div className="home-row home-row-3">
+      <div className="home-row home-row-4">
         <SeoHealthCard />
+        <SearchKnowledgeCard />
         <GrowthCard />
         <AskCard />
       </div>

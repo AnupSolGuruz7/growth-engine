@@ -1,6 +1,6 @@
 import {
-  ArrowDownOutlined, ArrowRightOutlined, ArrowUpOutlined, BulbOutlined, CommentOutlined, FireOutlined, SearchOutlined,
-  SendOutlined, ThunderboltOutlined,
+  ArrowDownOutlined, ArrowRightOutlined, ArrowUpOutlined, BookOutlined, BulbOutlined, CommentOutlined, FireOutlined, GoogleOutlined,
+  SearchOutlined, SendOutlined, ThunderboltOutlined, WarningOutlined,
 } from '@ant-design/icons';
 import { Button, Card, Input, Progress, Skeleton, Space, Tag, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
@@ -335,11 +335,123 @@ export function GrowthCard() {
             {open.slice(0, 3).map((s) => (
               <li key={s.id}>
                 <span className={`prio prio-${s.priority}`}>{s.priority}</span>
-                <span className="ellipsis-2">{s.title}</span>
+                <span style={{ minWidth: 0 }}>
+                  <span className="ellipsis-2">{s.title}</span>
+                  {s.sources?.length > 0 && (
+                    <Tag bordered={false} color="green" className="plan-tag" title={s.sources.map((x) => x.cite).join('\n')}>
+                      <BookOutlined /> from your plan
+                    </Tag>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
         </>
+      )}
+    </Card>
+  );
+}
+
+// ------------------------------------------------------------------ Google search + knowledge base
+
+/** One line on the knowledge base behind the AI: size and freshness, or what needs attention. */
+function KnowledgeLine({ k }: { k: import('@growthos/shared-types').KnowledgeResponse }) {
+  const src = k.source!;
+  const pc = k.pending_changes;
+  const pending = pc ? pc.changed + pc.added + pc.removed : 0;
+  if (src.status === 'failed') {
+    return (
+      <div className="kb-line warn">
+        <WarningOutlined /> Knowledge sync failed — <Link to="/knowledge">check</Link>
+      </div>
+    );
+  }
+  if (src.status === 'queued' || src.status === 'syncing') {
+    const p = src.progress;
+    return (
+      <div className="kb-line">
+        <BookOutlined /> Syncing knowledge base{p?.total ? ` · ${Math.round((p.done / p.total) * 100)}%` : '…'}
+      </div>
+    );
+  }
+  return (
+    <div className={`kb-line ${pending ? 'warn' : ''}`}>
+      <BookOutlined /> {fmtNumber(src.stats?.documents ?? 0)} docs · synced {src.last_synced_at ? timeAgo(src.last_synced_at) : 'never'}
+      {pending > 0 && (
+        <>
+          {' · '}
+          <Link to="/knowledge">
+            {pending} file{pending === 1 ? '' : 's'} changed since — sync
+          </Link>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Google search at a glance from the Search Console snapshot in the site's knowledge base, and
+ * the state of that knowledge base. Without one, invites connecting it.
+ */
+export function SearchKnowledgeCard() {
+  const { site } = useCurrentSite();
+  const kb = useQuery({
+    queryKey: ['knowledge', site?.id],
+    queryFn: () => api.knowledge(site!.id),
+    enabled: !!site,
+    refetchInterval: (q) => (['queued', 'syncing'].includes(q.state.data?.source?.status ?? '') ? 3000 : false),
+  });
+  const hasGsc = !!kb.data?.source?.stats && kb.data.source.stats.gsc.queries + kb.data.source.stats.gsc.pages > 0;
+  const gsc = useQuery({ queryKey: ['gsc', site?.id], queryFn: () => api.gscSummary(site!.id), enabled: !!site && hasGsc });
+  const g = gsc.data;
+  const months = (g?.monthly ?? []).map((m) => m.clicks);
+
+  return (
+    <Card size="small" className="home-card" title={<span><GoogleOutlined /> Google search</span>} extra={<CardLink to="/knowledge">Details</CardLink>}>
+      {kb.isLoading || (hasGsc && gsc.isLoading) ? (
+        <Skeleton active paragraph={{ rows: 4 }} title={false} />
+      ) : !kb.data?.source ? (
+        <div>
+          <Typography.Paragraph type="secondary">
+            Connect your growth or content repo: the AI then works from your brand facts, plans and rules, and Search Console exports show up here.
+          </Typography.Paragraph>
+          <Link to="/knowledge"><Button type="primary" size="small" icon={<BookOutlined />}>Connect knowledge</Button></Link>
+        </div>
+      ) : (
+        <div className="gsc-mini">
+          {g && g.totals.queries > 0 ? (
+            <>
+              <div className="gsc-head">
+                <div>
+                  <span className="gsc-big">{fmtNumber(g.totals.clicks)}</span> clicks
+                  <div className="gsc-sub">
+                    {fmtNumber(g.totals.impressions)} impressions{g.query_days ? ` · ${g.query_days} days` : ''}
+                  </div>
+                </div>
+                <Sparkline values={months} label="Google clicks per month" />
+              </div>
+              <Tag bordered={false} className="gsc-snap">snapshot, not live</Tag>
+              {g.opportunities.length > 0 && (
+                <>
+                  <div className="sugg-label" style={{ marginTop: 8 }}>Near page 1</div>
+                  <ul className="gsc-opps">
+                    {g.opportunities.slice(0, 3).map((o) => (
+                      <li key={o.query}>
+                        <span className="ellipsis-1" title={o.query}>{o.query}</span>
+                        <span className="gsc-pos">#{o.position?.toFixed(0)} · {fmtNumber(o.impressions)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
+          ) : (
+            <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+              No Search Console export in this knowledge base. Add one (JSON with <code>"source": "gsc"</code>) and sync to see search queries here.
+            </Typography.Paragraph>
+          )}
+          <KnowledgeLine k={kb.data} />
+        </div>
       )}
     </Card>
   );

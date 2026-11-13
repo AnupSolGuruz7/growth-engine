@@ -8,7 +8,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
-import { checkRules, embedQuery, toVectorLiteral, type ContentRule } from '@growthos/knowledge';
+import { checkRules, embedQuery, toVectorLiteral, walkSource, type ContentRule } from '@growthos/knowledge';
 import {
   KNOWLEDGE_JOB, KNOWLEDGE_QUEUE,
   type GscSummaryDto, type KnowledgeHit, type KnowledgeResponse, type KnowledgeSourceDto, type RuleFlagDto,
@@ -88,15 +88,40 @@ export class KnowledgeService implements OnApplicationBootstrap, OnApplicationSh
     const [src] = await this.ds.query(`SELECT * FROM knowledge_sources WHERE site_id = $1`, [site.id]);
     const documents = src
       ? await this.ds.query(
-          `SELECT path, title, chunk_count, bytes, modified_at FROM knowledge_documents WHERE source_id = $1 ORDER BY path`,
+          `SELECT path, title, chunk_count, bytes, modified_at, synced_at FROM knowledge_documents WHERE source_id = $1 ORDER BY path`,
           [src.id],
         )
       : [];
     return {
       source: src ? this.toDto(src) : null,
-      documents: documents.map((d: Record<string, any>) => ({ ...d, modified_at: iso(d.modified_at) })),
+      documents: documents.map(({ synced_at: _s, ...d }: Record<string, any>) => ({ ...d, modified_at: iso(d.modified_at) })),
       allowed_roots: this.cfg.knowledgeAllowedRoots,
+      pending_changes: src?.status === 'ready' ? await this.pendingChanges(src.root_path, documents) : null,
     };
+  }
+
+  /** Cheap staleness check: stats the folder's text files against the stored documents (no reading or hashing). */
+  private async pendingChanges(
+    root: string,
+    docs: { path: string; synced_at: Date | string; modified_at: Date | string | null }[],
+  ): Promise<KnowledgeResponse['pending_changes']> {
+    try {
+      const files = (await walkSource(root)).filter((f) => ['.md', '.mdx', '.txt'].includes(f.ext));
+      const known = new Map(docs.map((d) => [d.path, d]));
+      let changed = 0;
+      let added = 0;
+      for (const f of files) {
+        const d = known.get(f.rel);
+        if (!d) added++;
+        // newer than both the last sync of that file and the mtime recorded then (allow 1 s of clock rounding)
+        else if (f.mtime.getTime() > Math.max(new Date(d.synced_at).getTime(), d.modified_at ? new Date(d.modified_at).getTime() : 0) + 1000) changed++;
+      }
+      const present = new Set(files.map((f) => f.rel));
+      const removed = docs.filter((d) => !present.has(d.path)).length;
+      return { changed, added, removed };
+    } catch {
+      return null;
+    }
   }
 
   /** Validates a folder: it must exist and resolve (following links) inside an allowed root. */
