@@ -1,6 +1,7 @@
 import {
   AppstoreOutlined,
   BarChartOutlined,
+  BookOutlined,
   BulbOutlined,
   CommentOutlined,
   FileTextOutlined,
@@ -49,6 +50,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { key: '/seo', icon: <SearchOutlined />, label: 'SEO audit' },
       { key: '/growth', icon: <BulbOutlined />, label: 'Growth suggestions' },
       { key: '/ask', icon: <CommentOutlined />, label: 'Ask AI' },
+      { key: '/knowledge', icon: <BookOutlined />, label: 'Knowledge base' },
     ],
   },
   { title: 'Settings', items: [{ key: '/sites', icon: <SettingOutlined />, label: 'Sites & install' }] },

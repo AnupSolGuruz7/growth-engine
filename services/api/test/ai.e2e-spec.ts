@@ -84,18 +84,18 @@ describe('AI insights (e2e, scripted provider)', () => {
           {
             title: 'Improve the pricing page', area: 'content',
             evidence: [{ ref: 'overview.sessions', value: sessions }, { ref: 'overview.bounce_rate', value: `${(bounce * 100).toFixed(1)}%` }],
-            action: 'Add a comparison table.', copy: null, expected_outcome: 'May reduce bounces.', assumptions: null,
+            action: 'Add a comparison table.', copy: null, sources: [], expected_outcome: 'May reduce bounces.', assumptions: null,
             priority: 'high', effort: 'low', confidence: 'medium',
             measurement: { metric_ref: 'overview.bounce_rate', direction: 'decrease', window_days: 28 },
           },
           {
             title: 'Invented number', area: 'marketing', evidence: [{ ref: 'overview.sessions', value: '99999' }],
-            action: 'x', copy: null, expected_outcome: 'y', assumptions: null, priority: 'high', effort: 'low', confidence: 'high',
+            action: 'x', copy: null, sources: [], expected_outcome: 'y', assumptions: null, priority: 'high', effort: 'low', confidence: 'high',
             measurement: { metric_ref: 'overview.sessions', direction: 'increase', window_days: 28 },
           },
           {
             title: 'Unknown metric', area: 'marketing', evidence: [{ ref: 'overview.revenue', value: '100' }],
-            action: 'x', copy: null, expected_outcome: 'y', assumptions: null, priority: 'low', effort: 'low', confidence: 'low',
+            action: 'x', copy: null, sources: [], expected_outcome: 'y', assumptions: null, priority: 'low', effort: 'low', confidence: 'low',
             measurement: { metric_ref: 'overview.revenue', direction: 'increase', window_days: 28 },
           },
         ],
@@ -252,7 +252,7 @@ describe('validateSuggestions', () => {
     { ref: 'seo:abc.severity', value: 'high', label: 'Finding', link: '/seo' },
   ];
   const s = (evidence: { ref: string; value: string }[], metric = 'overview.sessions'): SuggestionOutput['suggestions'][number] => ({
-    title: 'T', area: 'seo', evidence, action: 'a', copy: null, expected_outcome: 'o', assumptions: null,
+    title: 'T', area: 'seo', evidence, action: 'a', copy: null, sources: [], expected_outcome: 'o', assumptions: null,
     priority: 'high', effort: 'low', confidence: 'high', measurement: { metric_ref: metric, direction: 'increase', window_days: 99 },
   });
   it('accepts numbers with separators and rates as percentages', () => {

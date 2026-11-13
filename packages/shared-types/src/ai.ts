@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { RuleFlagDto, SourceRef } from './knowledge';
 
 export const SUGGESTION_STATUSES = ['new', 'accepted', 'dismissed', 'done'] as const;
 export type SuggestionStatus = (typeof SUGGESTION_STATUSES)[number];
@@ -51,6 +52,10 @@ export interface SuggestionDto {
   created_at: string;
   /** Before/after comparison of the measurement metric, once marked done. */
   result: MeasurementResult | null;
+  /** Knowledge-base passages the suggestion draws on (verified to exist). */
+  sources: SourceRef[];
+  /** Content rules from the knowledge source that this suggestion's text breaks. */
+  rule_flags: RuleFlagDto[];
 }
 
 export interface SuggestionRunDto {
@@ -85,6 +90,10 @@ export interface AskTurn {
   at: string;
   /** Tools the assistant used to answer (names + date ranges), for transparency. */
   tools?: { name: string; input: Record<string, unknown> }[];
+  /** Knowledge-base passages the assistant retrieved while answering. */
+  sources?: SourceRef[];
+  /** Content rules from the knowledge source that the answer breaks. */
+  rule_flags?: RuleFlagDto[];
 }
 
 export interface ConversationDto {
@@ -99,6 +108,10 @@ export interface DraftDto {
   finding_id: string;
   drafts: { field: string; value: string; note: string; length: number }[];
   caution: string | null;
+  /** Content rules broken by the drafted copy (per draft index). */
+  rule_flags?: { index: number; flags: RuleFlagDto[] }[];
+  /** Knowledge passages given to the model as brand context. */
+  sources?: SourceRef[];
   created_at: string;
 }
 

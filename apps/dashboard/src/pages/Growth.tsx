@@ -8,6 +8,7 @@ import { api, ApiError } from '../api';
 import { AiError, AiSetupCard, BudgetMeter, Thinking, modelLabel, useAiStatus } from '../components/ai/AiBits';
 import { fmtNumber, timeAgo } from '../dates';
 import { useCurrentSite } from '../hooks';
+import { RuleFlags, Sources } from '../components/ai/Grounding';
 import { PageHeader } from '../components/PageHeader';
 
 const AREA: Record<string, { label: string; color: string }> = {
@@ -94,6 +95,7 @@ function SuggestionCard({ s, siteId, defaultOpen }: { s: SuggestionDto; siteId: 
           {s.copy}
         </Typography.Paragraph>
       )}
+      <RuleFlags flags={s.rule_flags} />
       {s.result && <Result s={s} />}
       <button type="button" className="sugg-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
         {open ? 'Hide' : 'Why'} &amp; how to measure <span aria-hidden>{open ? '▴' : '▾'}</span>
@@ -103,6 +105,7 @@ function SuggestionCard({ s, siteId, defaultOpen }: { s: SuggestionDto; siteId: 
           <div>
             <div className="sugg-label">Evidence · checked against your data</div>
             <Evidence items={s.evidence} />
+            <Sources refs={s.sources} label='Grounded in your knowledge base' />
           </div>
           <div>
             <div className="sugg-label">Expected outcome</div>

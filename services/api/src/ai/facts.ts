@@ -4,6 +4,7 @@ import { previousPeriod, type AnalyticsQuery } from '@growthos/shared-types';
 import type { DataSource } from 'typeorm';
 import { AnalyticsService } from '../analytics/analytics.service';
 import type { TenantContext } from '../common/tenant';
+import { KnowledgeService } from '../knowledge/knowledge.service';
 import { SitesService } from '../sites/sites.service';
 
 /**
@@ -30,12 +31,21 @@ export interface FactSet {
   seoAuditId: string | null;
 }
 
+/** How many Search Console rows become facts (kept small for small-context plans). */
+export interface GscLimits {
+  topQueries: number;
+  opportunities: number;
+  pages: number;
+}
+export const GSC_LIMITS: GscLimits = { topQueries: 5, opportunities: 6, pages: 5 };
+
 /** Scopes whose numeric metrics can be re-computed for any date range (used for before/after). */
 export const MEASURABLE_SCOPES = ['overview', 'landing', 'page', 'channel', 'event', 'device'] as const;
 
 const LINK: Record<string, string> = {
   overview: '/', overview_prev: '/', landing: '/pages', page: '/pages', channel: '/sources', campaign: '/sources',
   referrer: '/sources', event: '/events', event_page: '/events', device: '/devices', seo: '/seo',
+  gsc: '/knowledge', gsc_query: '/knowledge', gsc_page: '/knowledge',
 };
 
 export function parseRef(ref: string): { scope: string; key: string | null; metric: string } | null {
@@ -61,6 +71,7 @@ export class FactsService {
     @InjectDataSource() private readonly ds: DataSource,
     private readonly analytics: AnalyticsService,
     private readonly sites: SitesService,
+    private readonly knowledge: KnowledgeService,
   ) {}
 
   /** Last 28 complete days + today in the site timezone, and the 28 days before. */
@@ -70,7 +81,7 @@ export class FactsService {
   }
 
   /** Builds the evidence pack for suggestion generation. All numbers come from the analytics APIs. */
-  async build(t: TenantContext, siteId: string): Promise<FactSet> {
+  async build(t: TenantContext, siteId: string, opts: { gsc?: GscLimits | false } = {}): Promise<FactSet> {
     const site = await this.sites.getOwned(t, siteId);
     const range = FactsService.defaultRange(site.timezone);
     const q: AnalyticsQuery = { site_id: site.id, ...range, compare: 'previous', limit: 15 };
@@ -143,9 +154,16 @@ export class FactsService {
           [audit.id],
         );
       for (const f of findings) {
-        add(`seo:${f.id}.severity`, f.severity, `SEO finding "${f.title}" (${f.check_id}) on ${f.url}, page views 28d: ${f.pageviews_28d}`, true);
+        // A host whose canonicals all point to another domain is usually a staging/mirror copy, where that
+        // is correct; without this caveat models "fix" it by pointing canonicals at the staging host.
+        const caveat =
+          f.check_id === 'canonical_other_domain'
+            ? ' — CORRECT if this host is a staging or mirror copy of that domain; never suggest pointing canonicals at this host unless it is meant to replace that domain in search'
+            : '';
+        add(`seo:${f.id}.severity`, f.severity, `SEO finding "${f.title}" (${f.check_id}) on ${f.url}, page views 28d: ${f.pageviews_28d}${caveat}`, true);
       }
     }
+    if (opts.gsc !== false) await this.addGscFacts(site.id, add, opts.gsc ?? GSC_LIMITS);
     return {
       site: { id: site.id, organization_id: site.organization_id, name: site.name, domain: site.domain, timezone: site.timezone },
       range,
@@ -153,6 +171,62 @@ export class FactsService {
       facts,
       seoAuditId: audit?.id ?? null,
     };
+  }
+
+  /**
+   * Search Console snapshot imported from the site's knowledge source. It is a fixed export (not live
+   * and not re-computable for other date ranges), so it is evidence only, never a measurement metric:
+   * totals, top queries, striking-distance queries and top pages.
+   */
+  private async addGscFacts(
+    siteId: string,
+    add: (ref: string, value: number | string, label: string, untrusted?: boolean) => void,
+    limits: GscLimits,
+  ): Promise<void> {
+    if (!(await this.knowledge.hasGsc(siteId))) return;
+    const r1 = (n: number) => Math.round(n * 10) / 10;
+    const [tot] = await this.ds.query(
+      `SELECT max(period_days) AS days, count(*)::int AS queries, coalesce(sum(clicks), 0)::int AS clicks, coalesce(sum(impressions), 0)::int AS impressions
+       FROM gsc_queries WHERE site_id = $1`,
+      [siteId],
+    );
+    // Kept compact: Groq's free tier caps a request at ~8k tokens, so labels are short and CTR is
+    // left out (clicks ÷ impressions says the same thing).
+    const span = tot.days ? `${tot.days}d Search Console snapshot` : 'Search Console snapshot';
+    if (tot.queries) {
+      add('gsc.queries', tot.queries, `Google queries with impressions, ${span}`);
+      add('gsc.clicks', tot.clicks, `Google clicks over those queries, ${span}`);
+      add('gsc.impressions', tot.impressions, `Google impressions over those queries, ${span}`);
+    }
+    type Row = { query: string; clicks: number; impressions: number; position: number | null };
+    const top: Row[] = await this.ds.query(
+      `SELECT query, clicks, impressions, position FROM gsc_queries WHERE site_id = $1 ORDER BY clicks DESC, impressions DESC LIMIT ${limits.topQueries}`,
+      [siteId],
+    );
+    const opp = limits.opportunities ? await this.knowledge.gscOpportunities(siteId, limits.opportunities) : [];
+    const seen = new Set<string>();
+    for (const q of [...top, ...opp]) {
+      if (seen.has(q.query)) continue;
+      seen.add(q.query);
+      add(`gsc_query:${q.query}.impressions`, q.impressions, `GSC impressions "${q.query}"`, true);
+      add(`gsc_query:${q.query}.clicks`, q.clicks, `GSC clicks "${q.query}"`, true);
+      if (q.position !== null) add(`gsc_query:${q.query}.position`, r1(q.position), `GSC avg position "${q.query}"`, true);
+    }
+    const pages: (Omit<Row, 'query'> & { page: string })[] = await this.ds.query(
+      `SELECT page, clicks, impressions, position FROM gsc_pages WHERE site_id = $1 ORDER BY impressions DESC LIMIT ${limits.pages}`,
+      [siteId],
+    );
+    for (const p of pages) {
+      let path = p.page;
+      try {
+        path = new URL(p.page).pathname;
+      } catch {
+        /* keep the raw value */
+      }
+      add(`gsc_page:${path}.impressions`, p.impressions, `GSC impressions page ${path}`, true);
+      add(`gsc_page:${path}.clicks`, p.clicks, `GSC clicks page ${path}`, true);
+      if (p.position !== null) add(`gsc_page:${path}.position`, r1(p.position), `GSC avg position page ${path}`, true);
+    }
   }
 
   /** Re-computes a measurable metric for any date range (suggestion before/after comparison). */

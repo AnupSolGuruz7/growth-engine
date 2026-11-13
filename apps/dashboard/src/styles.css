@@ -260,3 +260,25 @@ body { background: #F7F7F7; color: #3F5268; }
 .devices-layout > * { min-width: 0; }
 @media (max-width: 900px) { .devices-layout { grid-template-columns: 1fr; } }
 .issue-head { grid-template-columns: 92px minmax(0, 1fr) auto !important; }
+
+/* ---- knowledge base ---- */
+.kb-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .kb-row { grid-template-columns: 1fr; } }
+.kb-source-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.kb-source-name { font-size: 16px; color: #2A3F54; font-weight: 500; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.kb-path { display: block; font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.kb-meta { font-size: 12px; color: #8A9AAD; margin-top: 4px; }
+.kb-examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.kb-hits { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.kb-hits li { border: 1px solid #eceef1; border-radius: 12px; padding: 10px 12px; background: #fafbfc; min-width: 0; }
+.kb-hit-cite { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #169F85; font-weight: 500; min-width: 0; }
+.kb-hit-cite > span:not(.ant-tag) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.kb-hit-text.ant-typography { margin: 6px 0 0 !important; font-size: 13px; color: #4a5a6a; white-space: pre-wrap; }
+.kb-doc-title { color: #2A3F54; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* sources + content-rule flags on AI output */
+.ai-sources { margin-top: 10px; font-size: 12px; color: #73879C; }
+.ai-sources ul { margin: 4px 0 0; padding-left: 18px; }
+.ai-sources li { overflow-wrap: anywhere; }
+.rule-flags { margin-top: 10px; border: 1px solid #F5D9A8; background: #FFF8EC; border-radius: 10px; padding: 8px 12px; font-size: 12px; color: #6b4b12; }
+.rule-flags ul { margin: 4px 0 0; padding-left: 18px; }

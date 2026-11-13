@@ -30,6 +30,11 @@ export const useDashboard = create<DashboardState>()(
       setCustom: (from, to) => set({ preset: 'custom', custom: { from, to } }),
       setCompare: (compare) => set({ compare }),
     }),
-    { name: 'growthos-dashboard' },
+    {
+      name: 'growthos-dashboard',
+      // v1: forget the remembered site once so the dashboard opens on the default site (the one with a knowledge base)
+      version: 1,
+      migrate: (state, version) => (version < 1 ? { ...(state as DashboardState), siteId: null } : state) as DashboardState,
+    },
   ),
 );

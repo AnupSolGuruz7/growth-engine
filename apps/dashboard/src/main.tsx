@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AppLayout } from './AppLayout';
 import { AskAiPage } from './pages/AskAi';
+import { KnowledgePage } from './pages/Knowledge';
 import { GrowthPage } from './pages/Growth';
 import { DevicesPage } from './pages/Devices';
 import { EventsPage } from './pages/Events';
@@ -38,6 +39,7 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="seo" element={<SeoPage />} />
                 <Route path="growth" element={<GrowthPage />} />
                 <Route path="ask" element={<AskAiPage />} />
+                <Route path="knowledge" element={<KnowledgePage />} />
                 <Route path="sites" element={<SitesPage />} />
                 <Route path="*" element={<OverviewPage />} />
               </Route>

@@ -26,6 +26,13 @@ export interface AppConfig {
   aiPriceOutputPerMTok: number | null;
   aiMonthlyBudgetUsd: number;
   aiAskDailyLimit: number;
+  /**
+   * Folders a site's knowledge source may be read from (KNOWLEDGE_ALLOWED_ROOTS, separated by ; or ,).
+   * Empty = connecting a knowledge source is refused: the API must never read arbitrary server paths.
+   */
+  knowledgeAllowedRoots: string[];
+  /** Upper bound on knowledge text added to one AI prompt (tokens, approx.). */
+  knowledgeContextTokens: number;
 }
 
 export const APP_CONFIG = Symbol('APP_CONFIG');
@@ -71,6 +78,8 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     aiPriceOutputPerMTok: process.env.AI_PRICE_OUTPUT_PER_MTOK ? Number(process.env.AI_PRICE_OUTPUT_PER_MTOK) : null,
     aiMonthlyBudgetUsd: num('AI_MONTHLY_BUDGET_USD', 20),
     aiAskDailyLimit: num('AI_ASK_DAILY_LIMIT', 50),
+    knowledgeAllowedRoots: (process.env.KNOWLEDGE_ALLOWED_ROOTS ?? '').split(/[;,]/).map((p) => p.trim()).filter(Boolean),
+    knowledgeContextTokens: num('KNOWLEDGE_CONTEXT_TOKENS', 1500),
     ...overrides,
   };
   if (!cfg.databaseUrl) throw new Error('DATABASE_URL is required');

@@ -2,6 +2,10 @@ import type {
   AiStatusDto,
   ConversationDto,
   DraftDto,
+  GscSummaryDto,
+  KnowledgeHit,
+  KnowledgeResponse,
+  KnowledgeSourceDto,
   SuggestionDto,
   SuggestionRunDto,
   SuggestionStatus,
@@ -105,6 +109,14 @@ export const api = {
     json<ConversationDto>('/v1/ai/ask', { method: 'POST', body: JSON.stringify({ site_id: siteId, question, conversation_id: conversationId }) }),
   conversations: (siteId: string) => json<Omit<ConversationDto, 'transcript'>[]>('/v1/ai/conversations' + qs({ site_id: siteId })),
   conversation: (id: string) => json<ConversationDto>(`/v1/ai/conversations/${id}`),
+  knowledge: (siteId: string) => json<KnowledgeResponse>(`/v1/sites/${siteId}/knowledge`),
+  connectKnowledge: (siteId: string, input: { name: string; root_path: string }) =>
+    json<KnowledgeSourceDto>(`/v1/sites/${siteId}/knowledge`, { method: 'PUT', body: JSON.stringify(input) }),
+  syncKnowledge: (siteId: string) => json<KnowledgeSourceDto>(`/v1/sites/${siteId}/knowledge/sync`, { method: 'POST' }),
+  disconnectKnowledge: (siteId: string) => request(`/v1/sites/${siteId}/knowledge`, { method: 'DELETE' }),
+  searchKnowledge: (siteId: string, q: string) => json<KnowledgeHit[]>(`/v1/sites/${siteId}/knowledge/search` + qs({ q, limit: '8' })),
+  gscSummary: (siteId: string) => json<GscSummaryDto>(`/v1/sites/${siteId}/knowledge/gsc`),
+
   draftFix: (findingId: string, regenerate = false) => json<DraftDto>(`/v1/seo/findings/${findingId}/draft`, { method: 'POST', body: JSON.stringify({ regenerate }) }),
 
   /** Fetches the CSV with the dev key header and hands it to the browser as a file. */

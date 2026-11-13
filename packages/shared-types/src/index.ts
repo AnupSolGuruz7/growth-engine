@@ -5,3 +5,4 @@ export * from './api';
 export * from './jobs';
 export * from './seo';
 export * from './ai';
+export * from './knowledge';

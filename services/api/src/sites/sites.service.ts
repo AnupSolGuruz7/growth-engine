@@ -20,7 +20,9 @@ export class SitesService {
 
   async list(t: TenantContext): Promise<SiteDto[]> {
     const rows: SiteRow[] = await this.ds.query(
-      `SELECT ${COLS} FROM sites WHERE organization_id = $1 ORDER BY created_at`,
+      // sites with a knowledge base first: the dashboard opens on the first site when none is chosen
+      `SELECT ${COLS} FROM sites WHERE organization_id = $1
+       ORDER BY EXISTS (SELECT 1 FROM knowledge_sources k WHERE k.site_id = sites.id) DESC, created_at`,
       [t.organizationId],
     );
     return rows.map(toDto);

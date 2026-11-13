@@ -10,6 +10,8 @@ import { DevKeyGuard } from './common/dev-key.guard';
 import { RedisService } from './common/redis';
 import { APP_CONFIG, type AppConfig } from './config';
 import { HealthController } from './health/health.controller';
+import { KnowledgeController } from './knowledge/knowledge.controller';
+import { KnowledgeService } from './knowledge/knowledge.service';
 import { IngestController } from './ingest/ingest.controller';
 import { IngestService } from './ingest/ingest.service';
 import { RateLimiter } from './ingest/rate-limiter';
@@ -32,6 +34,7 @@ export class AppModule {
       SiteCache,
       SitesService,
       SeoService,
+      KnowledgeService,
     ];
     return {
       module: AppModule,
@@ -53,7 +56,7 @@ export class AppModule {
         AnalyticsModule,
         AiModule.forRoot(cfg, deps.llm),
       ],
-      controllers: [HealthController, IngestController, SitesController, MetricsController, SdkController, SeoController],
+      controllers: [HealthController, IngestController, SitesController, MetricsController, SdkController, SeoController, KnowledgeController],
       providers: [
         ...shared,
         IngestService,

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { AskTurn, ConversationDto } from '@growthos/shared-types';
 import { api } from '../api';
+import { RuleFlags, Sources } from '../components/ai/Grounding';
 import { AiError, AiMarkdown, AiSetupCard, Thinking, modelLabel, useAiStatus } from '../components/ai/AiBits';
 import { timeAgo } from '../dates';
 import { useCurrentSite } from '../hooks';
@@ -21,6 +22,7 @@ const STARTERS = [
 const TOOL_LABEL: Record<string, string> = {
   get_overview: 'Overview', get_top_pages: 'Top pages', get_landing_pages: 'Landing pages', get_traffic_sources: 'Sources',
   get_event_breakdown: 'Events', get_devices: 'Devices', compare_periods: 'Period comparison', get_seo_findings: 'SEO audit',
+  search_knowledge: 'Knowledge base', get_search_console: 'Search Console',
 };
 
 function Turn({ turn }: { turn: AskTurn }) {
@@ -35,10 +37,13 @@ function Turn({ turn }: { turn: AskTurn }) {
             <Tag key={i} bordered={false} style={{ fontSize: 11 }}>
               {TOOL_LABEL[t.name] ?? t.name}
               {t.input.from ? ` ${t.input.from} → ${t.input.to}` : ''}
+              {typeof t.input.query === 'string' ? `: ${t.input.query}` : ''}
             </Tag>
           ))}
         </div>
       )}
+      <Sources refs={turn.sources} />
+      <RuleFlags flags={turn.rule_flags} />
     </div>
   );
 }

@@ -6,7 +6,8 @@ name: growthos
 
 services:
   postgres:
-    image: postgres:16-alpine
+    build: ./docker/postgres
+    image: growthos-postgres:16-pgvector
     environment:
       POSTGRES_USER: growthos
       POSTGRES_PASSWORD: growthos

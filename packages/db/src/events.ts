@@ -148,7 +148,7 @@ const ANALYTICS_TABLES = [
  * log and are always kept.
  */
 export async function deleteSiteData(db: Db, siteId: string, opts: { analyticsOnly?: boolean } = {}): Promise<void> {
-  for (const t of [...ANALYTICS_TABLES, ...(opts.analyticsOnly ? [] : ['seo_audits', 'suggestion_runs', 'ai_conversations'])]) {
+  for (const t of [...ANALYTICS_TABLES, ...(opts.analyticsOnly ? [] : ['seo_audits', 'suggestion_runs', 'ai_conversations', 'knowledge_sources'])]) {
     await db.query(`DELETE FROM ${t} WHERE site_id = $1`, [siteId]);
   }
 }

@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import type { DraftDto, SeoFindingDto } from '@growthos/shared-types';
 import { api } from '../../api';
 import { AiError, Thinking } from '../ai/AiBits';
+import { RuleFlags, Sources } from '../ai/Grounding';
 
 // Mirrors DRAFTABLE_CHECKS in shared-types (the dashboard imports types only).
 const DRAFTABLE = new Set([
@@ -43,10 +44,12 @@ export function DraftFix({ finding }: { finding: SeoFindingDto }) {
                   </Typography.Text>
                   <Typography.Paragraph copyable={{ text: x.value }} className="fix" style={{ marginBottom: 2 }}>{x.value}</Typography.Paragraph>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>{x.note}</Typography.Text>
+                  <RuleFlags flags={d.rule_flags?.find((r) => r.index === i)?.flags} />
                 </div>
               );
             })}
             {d.caution && <Alert type="warning" showIcon message={d.caution} />}
+            <Sources refs={d.sources} label='Brand context used' />
           </Space>
         </Card>
       )}
