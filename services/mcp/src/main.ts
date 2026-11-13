@@ -108,11 +108,28 @@ const DRAFTABLE = new Set([
 
 type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 const ok = (value: unknown): ToolResult => ({ content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 1) }] });
-const run = (fn: () => Promise<unknown>) => async (): Promise<ToolResult> => {
+/** What a tool call did, for the dashboard's agent activity log. Summaries only — never copy or passages. */
+interface ActivityLog { site?: string; summary?: string }
+
+/** Reports one tool call to GrowthOS (best effort; never fails or delays the tool result). */
+function report(tool: string, log: ActivityLog, okCall: boolean): void {
+  const client = server.server.getClientVersion()?.name ?? null;
+  api('/v1/agent/activity', {
+    method: 'POST',
+    body: { tool, client, site_id: log.site ?? null, ok: okCall, summary: (log.summary ?? tool).slice(0, 300) },
+  }).catch(() => undefined);
+}
+
+const run = (tool: string, fn: (log: ActivityLog) => Promise<unknown>) => async (): Promise<ToolResult> => {
+  const log: ActivityLog = {};
   try {
-    return ok(await fn());
+    const out = ok(await fn(log));
+    report(tool, log, true);
+    return out;
   } catch (e) {
-    return { content: [{ type: 'text', text: e instanceof ApiError ? e.message : `Error: ${(e as Error).message}` }], isError: true };
+    const msg = e instanceof ApiError ? e.message : `Error: ${(e as Error).message}`;
+    report(tool, { ...log, summary: `${log.summary ?? tool} — failed: ${msg}` }, false);
+    return { content: [{ type: 'text', text: msg }], isError: true };
   }
 };
 const siteArg = z.string().optional().describe('Site id, name or domain. Defaults to GROWTHOS_SITE, else the first site (the one with a knowledge base).');
@@ -136,15 +153,20 @@ server.registerTool('list_sites', {
   title: 'List sites',
   description: 'Sites tracked in GrowthOS (id, name, domain). The first one is the default.',
   annotations: READ,
-}, run(async () => (await api<Site[]>('/v1/sites')).map((s) => ({ id: s.id, name: s.name, domain: s.domain }))));
+}, run('list_sites', async (log) => {
+  const sites = await api<Site[]>('/v1/sites');
+  log.summary = `Listed ${sites.length} sites`;
+  return sites.map((s) => ({ id: s.id, name: s.name, domain: s.domain }));
+}));
 
 server.registerTool('seo_overview', {
   title: 'SEO audit overview',
   description: 'Latest SEO audit of a site: score, pages crawled, and issue counts per check (worst first). Use check_id values with list_findings.',
   inputSchema: { site: siteArg },
   annotations: READ,
-}, async ({ site }) => run(async () => {
+}, async ({ site }) => run('seo_overview', async (log) => {
   const s = await resolveSite(site);
+  log.site = s.id;
   const { latest, completed } = await latestAudit(s.id);
   if (!completed) return { site: s.name, latest_audit: latest ? { id: latest.id, status: latest.status } : null, note: 'No completed audit yet. Use start_audit.' };
   const findings = await api<Finding[]>(`/v1/seo/audits/${completed.id}/findings`);
@@ -154,6 +176,7 @@ server.registerTool('seo_overview', {
     e.count++;
     by.set(f.check_id, e);
   }
+  log.summary = `Read SEO overview: score ${completed.score ?? '–'}, ${findings.length} issues`;
   return {
     site: `${s.name} (${s.domain})`,
     audit: { id: completed.id, score: completed.score, pages_crawled: completed.pages_crawled, finished_at: completed.finished_at },
@@ -174,8 +197,9 @@ server.registerTool('list_findings', {
     limit: z.number().int().min(1).max(100).default(20),
   },
   annotations: READ,
-}, async ({ site, check_id, severity, url, limit }) => run(async () => {
+}, async ({ site, check_id, severity, url, limit }) => run('list_findings', async (log) => {
   const s = await resolveSite(site);
+  log.site = s.id;
   const { completed } = await latestAudit(s.id);
   if (!completed) throw new ApiError('No completed audit yet. Use start_audit.');
   const qs = new URLSearchParams();
@@ -184,6 +208,7 @@ server.registerTool('list_findings', {
   let findings = await api<Finding[]>(`/v1/seo/audits/${completed.id}/findings?${qs}`);
   if (url) findings = findings.filter((f) => f.url.includes(url) || pathOf(f.url) === url);
   findings.sort((a, b) => b.priority - a.priority);
+  log.summary = `Pulled ${Math.min(limit, findings.length)} of ${findings.length} findings${check_id ? ` · ${check_id}` : ''}${severity ? ` · ${severity}` : ''}${url ? ` · ${url}` : ''}`;
   return {
     audit_id: completed.id,
     total: findings.length,
@@ -200,8 +225,9 @@ server.registerTool('get_page', {
   description: "What the latest audit saw on one page: title, meta description, H1s, headings, canonical, robots, word count, plus that page's findings.",
   inputSchema: { url: z.string().describe('Full URL or a path like /investors/'), site: siteArg },
   annotations: READ,
-}, async ({ url, site }) => run(async () => {
+}, async ({ url, site }) => run('get_page', async (log) => {
   const s = await resolveSite(site);
+  log.site = s.id;
   const { completed } = await latestAudit(s.id);
   if (!completed) throw new ApiError('No completed audit yet. Use start_audit.');
   const full = /^https?:\/\//.test(url) ? url : `https://${s.domain}${url.startsWith('/') ? '' : '/'}${url}`;
@@ -210,6 +236,7 @@ server.registerTool('get_page', {
   const out: Record<string, unknown> = Object.fromEntries(pick.filter((k) => k in page).map((k) => [k, page[k]]));
   if (Array.isArray(page.headings)) out.headings = (page.headings as unknown[]).slice(0, 40);
   if (Array.isArray(page.issues)) out.findings = (page.issues as Finding[]).map((f) => ({ id: f.id, check_id: f.check_id, severity: f.severity, title: f.title, evidence: f.evidence, suggested_fix: f.suggested_fix }));
+  log.summary = `Read page ${pathOf(full)}`;
   return out;
 })());
 
@@ -218,10 +245,11 @@ server.registerTool('draft_fix', {
   description: 'AI-written replacement copy for one finding (titles, meta descriptions, H1s, alt text, JSON-LD, content outline), grounded in the page content and brand knowledge, with rule-check flags. Cached per finding; regenerate=true writes new alternatives. Uses one AI call.',
   inputSchema: { finding_id: z.string().uuid(), regenerate: z.boolean().default(false) },
   annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true },
-}, async ({ finding_id, regenerate }) => run(async () => {
+}, async ({ finding_id, regenerate }) => run('draft_fix', async (log) => {
   const d = await api<{ drafts: { field: string; value: string; note: string; length: number }[]; caution: string | null; rule_flags?: { index: number; flags: unknown[] }[] }>(
     `/v1/seo/findings/${finding_id}/draft`, { method: 'POST', body: { regenerate } },
   );
+  log.summary = `Drafted ${d.drafts.length} ${d.drafts[0]?.field.replace('_', ' ') ?? 'copy'} alternative${d.drafts.length === 1 ? '' : 's'}${regenerate ? ' (regenerated)' : ''}`;
   return {
     alternatives: d.drafts.map((x, i) => ({ ...x, rule_flags: d.rule_flags?.find((r) => r.index === i)?.flags ?? [] })),
     caution: d.caution,
@@ -236,11 +264,14 @@ server.registerTool('list_suggestions', {
     status: z.enum(['new', 'accepted', 'dismissed', 'done', 'open']).default('open').describe('open = new + accepted'),
   },
   annotations: READ,
-}, async ({ site, status }) => run(async () => {
+}, async ({ site, status }) => run('list_suggestions', async (log) => {
   const s = await resolveSite(site);
+  log.site = s.id;
   const res = await api<{ suggestions: Array<Record<string, unknown> & { status: string }> }>(`/v1/suggestions?site_id=${s.id}`);
   const keep = (x: { status: string }) => (status === 'open' ? x.status === 'new' || x.status === 'accepted' : x.status === status);
-  return res.suggestions.filter(keep).map((x) => ({
+  const list = res.suggestions.filter(keep);
+  log.summary = `Read ${list.length} ${status} suggestion${list.length === 1 ? '' : 's'}`;
+  return list.map((x) => ({
     id: x.id, title: x.title, area: x.area, status: x.status, priority: x.priority, effort: x.effort, confidence: x.confidence,
     action: x.action, copy: x.copy, expected_outcome: x.expected_outcome, measurement: x.measurement,
     evidence: (x.evidence as { label: string; value: unknown }[]).map((e) => `${e.label}: ${e.value}`),
@@ -254,8 +285,9 @@ server.registerTool('update_suggestion', {
   description: 'Mark a growth suggestion accepted (being worked on), done (shipped — GrowthOS then measures its effect) or dismissed.',
   inputSchema: { suggestion_id: z.string().uuid(), status: z.enum(['new', 'accepted', 'dismissed', 'done']) },
   annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
-}, async ({ suggestion_id, status }) => run(async () => {
+}, async ({ suggestion_id, status }) => run('update_suggestion', async (log) => {
   const x = await api<{ id: string; title: string; status: string }>(`/v1/suggestions/${suggestion_id}`, { method: 'PATCH', body: { status } });
+  log.summary = `Marked “${x.title}” ${x.status}`;
   return { id: x.id, title: x.title, status: x.status };
 })());
 
@@ -268,9 +300,11 @@ server.registerTool('search_knowledge', {
     limit: z.number().int().min(1).max(10).default(5),
   },
   annotations: READ,
-}, async ({ query, site, limit }) => run(async () => {
+}, async ({ query, site, limit }) => run('search_knowledge', async (log) => {
   const s = await resolveSite(site);
+  log.site = s.id;
   const hits = await api<{ cite: string; content: string; match: string }[]>(`/v1/sites/${s.id}/knowledge/search?q=${encodeURIComponent(query)}&limit=${limit}`);
+  log.summary = `Searched knowledge for “${query.slice(0, 80)}” · ${hits.length} hit${hits.length === 1 ? '' : 's'}`;
   if (!hits.length) return 'No results (or no knowledge base connected for this site).';
   return hits.map((h) => `### ${h.cite} (${h.match})\n${h.content}`).join('\n\n');
 })());
@@ -284,9 +318,11 @@ server.registerTool('search_console', {
     contains: z.string().optional().describe('Only rows whose query/page contains this text'),
   },
   annotations: READ,
-}, async ({ site, section, contains }) => run(async () => {
+}, async ({ site, section, contains }) => run('search_console', async (log) => {
   const s = await resolveSite(site);
+  log.site = s.id;
   const g = await api<Record<string, unknown> & { totals: { queries: number } }>(`/v1/sites/${s.id}/knowledge/gsc`);
+  log.summary = `Read Search Console ${section.replace('_', ' ')}${contains ? ` matching “${contains}”` : ''}`;
   if (!g.totals?.queries) return 'No Search Console data imported for this site.';
   const filt = <T extends { query?: string; page?: string }>(rows: T[]) =>
     contains ? rows.filter((r) => (r.query ?? r.page ?? '').toLowerCase().includes(contains.toLowerCase())) : rows;
@@ -301,11 +337,17 @@ server.registerTool('check_copy', {
   description: "Check user-facing copy (titles, descriptions, headings, body text) against the site's banned words and banned claims from its knowledge base. Run before committing any copy change; fix every 'block' flag.",
   inputSchema: { text: z.string().min(1).max(50000), site: siteArg },
   annotations: READ,
-}, async ({ text, site }) => run(async () => {
+}, async ({ text, site }) => run('check_copy', async (log) => {
   const s = await resolveSite(site);
+  log.site = s.id;
   const r = await api<{ rules: number; flags: { rule_id: string; kind: string; severity: string; quoted: string; why: string }[] }>(
     `/v1/sites/${s.id}/knowledge/check`, { method: 'POST', body: { text } },
   );
+  const blocks = r.flags.filter((f) => f.severity === 'block').length;
+  const warns = r.flags.length - blocks;
+  log.summary = !r.rules
+    ? `Checked copy (${text.length} chars) · no rules imported`
+    : r.flags.length ? `Checked copy (${text.length} chars) · ${blocks} block, ${warns} warn` : `Checked copy (${text.length} chars) · passed`;
   if (!r.rules) return { ok: true, note: 'No content rules imported for this site, so nothing was checked.' };
   return { ok: !r.flags.some((f) => f.severity === 'block'), rules_checked: r.rules, flags: r.flags };
 })());
@@ -315,9 +357,11 @@ server.registerTool('start_audit', {
   description: "Re-crawl the site's live domain to refresh findings (e.g. after a fix is deployed). Runs in the background for a few minutes; check progress with seo_overview.",
   inputSchema: { site: siteArg, max_pages: z.number().int().min(1).max(500).optional() },
   annotations: { readOnlyHint: false, openWorldHint: true },
-}, async ({ site, max_pages }) => run(async () => {
+}, async ({ site, max_pages }) => run('start_audit', async (log) => {
   const s = await resolveSite(site);
+  log.site = s.id;
   const a = await api<Audit>('/v1/seo/audits', { method: 'POST', body: { site_id: s.id, ...(max_pages ? { max_pages } : {}) } });
+  log.summary = `Started SEO audit${max_pages ? ` (max ${max_pages} pages)` : ''}`;
   return { audit_id: a.id, status: a.status, start_url: a.start_url, note: 'Crawl started; use seo_overview to see when it completes.' };
 })());
 

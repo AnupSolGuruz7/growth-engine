@@ -301,3 +301,19 @@ body { background: #F7F7F7; color: #3F5268; }
 .gsc-mini > .kb-line { margin-top: 12px; }
 .kb-line.warn { color: #9a6a12; }
 .plan-tag.ant-tag { margin: 3px 0 0; font-size: 11px; line-height: 18px; padding: 0 6px; }
+
+/* Coding agent (MCP) card on the Knowledge page */
+.agent-status { font-size: 12px; color: var(--ant-color-text-secondary, #73879C); display: inline-flex; align-items: center; gap: 6px; }
+.agent-dot { width: 8px; height: 8px; border-radius: 999px; background: #c5ccd3; display: inline-block; }
+.agent-dot.on { background: #1ABB9C; box-shadow: 0 0 0 3px rgba(26, 187, 156, 0.18); }
+.agent-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+@media (max-width: 900px) { .agent-grid { grid-template-columns: minmax(0, 1fr); } }
+.agent-cmd.ant-typography { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; background: rgba(115, 135, 156, 0.08); border-radius: 10px; padding: 8px 10px; word-break: break-all; margin-bottom: 8px; }
+.agent-log { list-style: none; margin: 8px 0 0; padding: 0; max-height: 300px; overflow-y: auto; }
+.agent-log li { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid rgba(115, 135, 156, 0.12); }
+.agent-log li:last-child { border-bottom: 0; }
+.agent-log .ok { color: #1ABB9C; margin-top: 3px; }
+.agent-log .bad { color: #E74C3C; margin-top: 3px; }
+.agent-log-main { min-width: 0; flex: 1; font-size: 13px; }
+.agent-log-meta { font-size: 12px; color: var(--ant-color-text-secondary, #73879C); }
+.agent-log-meta .ant-tag { font-size: 11px; line-height: 18px; padding: 0 6px; margin-right: 6px; }
