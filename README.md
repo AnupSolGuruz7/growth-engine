@@ -310,3 +310,4 @@ Notes on the dashboard smoke test:
 - **SEO crawler:** it doesn't run JavaScript. Pages rendered by JavaScript are flagged, and their content checks are marked low-confidence; rendering them with Playwright is not built.
 - **Report filters:** the spec's channel, campaign, device and page-path filters aren't built. Reports filter by site, date range and comparison period only.
 - **Automatic retention:** only per-site deletion exists (`DELETE /v1/sites/:id/data`). Automatic retention (proposed: 13 months raw) is an open item in spec §16.
+# growth-engine
