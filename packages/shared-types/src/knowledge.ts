@@ -15,6 +15,15 @@ export const knowledgeSearchSchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).optional(),
 });
 
+/** Check copy against the knowledge source's content rules (banned words and claims). */
+export const knowledgeCheckSchema = z.object({ text: z.string().min(1).max(50000) });
+
+export interface KnowledgeCheckResponse {
+  /** Number of rules the text was checked against (0 = no rules imported, so nothing was checked). */
+  rules: number;
+  flags: RuleFlagDto[];
+}
+
 export interface KnowledgeStats {
   files: number;
   documents: number;

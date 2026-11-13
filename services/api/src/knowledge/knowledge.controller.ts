@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
-import { knowledgeSearchSchema, upsertKnowledgeSourceSchema } from '@growthos/shared-types';
+import { knowledgeCheckSchema, knowledgeSearchSchema, upsertKnowledgeSourceSchema } from '@growthos/shared-types';
 import { Tenant, type TenantContext } from '../common/tenant';
 import { parseOrThrow } from '../common/zod';
 import { KnowledgeService } from './knowledge.service';
@@ -34,6 +34,13 @@ export class KnowledgeController {
   search(@Tenant() t: TenantContext, @Param('siteId', ParseUUIDPipe) siteId: string, @Query() q: unknown) {
     const i = parseOrThrow(knowledgeSearchSchema, q);
     return this.knowledge.searchOwned(t, siteId, i.q, i.limit);
+  }
+
+  /** Content rules (banned words / claims) from the knowledge source that the given copy breaks. */
+  @Post('check')
+  @HttpCode(200)
+  check(@Tenant() t: TenantContext, @Param('siteId', ParseUUIDPipe) siteId: string, @Body() body: unknown) {
+    return this.knowledge.checkOwned(t, siteId, parseOrThrow(knowledgeCheckSchema, body).text);
   }
 
   @Get('gsc')
