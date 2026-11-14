@@ -6,3 +6,4 @@ export * from './jobs';
 export * from './seo';
 export * from './ai';
 export * from './knowledge';
+export * from './agent';

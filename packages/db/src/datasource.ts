@@ -6,6 +6,7 @@ import { SeoAudit1762963200000 } from './migrations/1762963200000-SeoAudit';
 import { AiInsights1763049600000 } from './migrations/1763049600000-AiInsights';
 import { AiConversationProvider1763136000000 } from './migrations/1763136000000-AiConversationProvider';
 import { Knowledge1763222400000 } from './migrations/1763222400000-Knowledge';
+import { AgentActivity1763308800000 } from './migrations/1763308800000-AgentActivity';
 
 // node-pg defaults: DATE -> JS Date at local midnight (timezone bugs), BIGINT/NUMERIC -> string.
 // Analytics needs calendar dates as plain strings and counts as numbers.
@@ -59,7 +60,7 @@ export const SiteEntity = new EntitySchema<SiteRow>({
   },
 });
 
-export const MIGRATIONS = [InitialSchema1762790400000, SeoAudit1762963200000, AiInsights1763049600000, AiConversationProvider1763136000000, Knowledge1763222400000];
+export const MIGRATIONS = [InitialSchema1762790400000, SeoAudit1762963200000, AiInsights1763049600000, AiConversationProvider1763136000000, Knowledge1763222400000, AgentActivity1763308800000];
 
 export function dataSourceOptions(url: string | undefined = process.env.DATABASE_URL): DataSourceOptions {
   if (!url) throw new Error('DATABASE_URL is not set');

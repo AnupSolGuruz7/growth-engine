@@ -1,4 +1,5 @@
 import type {
+  AgentResponse,
   AiStatusDto,
   ConversationDto,
   DraftDto,
@@ -109,6 +110,7 @@ export const api = {
     json<ConversationDto>('/v1/ai/ask', { method: 'POST', body: JSON.stringify({ site_id: siteId, question, conversation_id: conversationId }) }),
   conversations: (siteId: string) => json<Omit<ConversationDto, 'transcript'>[]>('/v1/ai/conversations' + qs({ site_id: siteId })),
   conversation: (id: string) => json<ConversationDto>(`/v1/ai/conversations/${id}`),
+  agent: (siteId: string) => json<AgentResponse>('/v1/agent' + qs({ site_id: siteId })),
   knowledge: (siteId: string) => json<KnowledgeResponse>(`/v1/sites/${siteId}/knowledge`),
   connectKnowledge: (siteId: string, input: { name: string; root_path: string }) =>
     json<KnowledgeSourceDto>(`/v1/sites/${siteId}/knowledge`, { method: 'PUT', body: JSON.stringify(input) }),

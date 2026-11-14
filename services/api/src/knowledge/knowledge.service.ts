@@ -11,7 +11,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { checkRules, embedQuery, toVectorLiteral, walkSource, type ContentRule } from '@growthos/knowledge';
 import {
   KNOWLEDGE_JOB, KNOWLEDGE_QUEUE,
-  type GscSummaryDto, type KnowledgeHit, type KnowledgeResponse, type KnowledgeSourceDto, type RuleFlagDto,
+  type GscSummaryDto, type KnowledgeCheckResponse, type KnowledgeHit, type KnowledgeResponse, type KnowledgeSourceDto, type RuleFlagDto,
 } from '@growthos/shared-types';
 import type { DataSource } from 'typeorm';
 import type { TenantContext } from '../common/tenant';
@@ -270,6 +270,13 @@ export class KnowledgeService implements OnApplicationBootstrap, OnApplicationSh
   async check(siteId: string, text: string): Promise<RuleFlagDto[]> {
     const rules = await this.rules(siteId);
     return rules.length ? checkRules(text, rules) : [];
+  }
+
+  /** check() for a site the caller owns; also says how many rules were applied. */
+  async checkOwned(t: TenantContext, siteId: string, text: string): Promise<KnowledgeCheckResponse> {
+    const site = await this.sites.getOwned(t, siteId);
+    const rules = await this.rules(site.id);
+    return { rules: rules.length, flags: rules.length ? checkRules(text, rules) : [] };
   }
 
   async gscSummary(t: TenantContext, siteId: string): Promise<GscSummaryDto> {

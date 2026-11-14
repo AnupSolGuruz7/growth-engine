@@ -10,6 +10,7 @@ import { DevKeyGuard } from './common/dev-key.guard';
 import { RedisService } from './common/redis';
 import { APP_CONFIG, type AppConfig } from './config';
 import { HealthController } from './health/health.controller';
+import { AgentController, AgentService } from './agent/agent.controller';
 import { KnowledgeController } from './knowledge/knowledge.controller';
 import { KnowledgeService } from './knowledge/knowledge.service';
 import { IngestController } from './ingest/ingest.controller';
@@ -56,10 +57,11 @@ export class AppModule {
         AnalyticsModule,
         AiModule.forRoot(cfg, deps.llm),
       ],
-      controllers: [HealthController, IngestController, SitesController, MetricsController, SdkController, SeoController, KnowledgeController],
+      controllers: [HealthController, IngestController, SitesController, MetricsController, SdkController, SeoController, KnowledgeController, AgentController],
       providers: [
         ...shared,
         IngestService,
+        AgentService,
         RateLimiter,
         MetricsService,
         { provide: APP_GUARD, useClass: DevKeyGuard },

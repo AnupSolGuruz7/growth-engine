@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { GscSummaryDto, KnowledgeHit, KnowledgeResponse, KnowledgeSourceDto } from '@growthos/shared-types';
 import { api, ApiError } from '../api';
+import { AgentCard } from '../components/AgentCard';
 import { StatStrip } from '../components/home/Charts';
 import { PageHeader } from '../components/PageHeader';
 import { fmtNumber, timeAgo } from '../dates';
@@ -400,6 +401,7 @@ export function KnowledgePage() {
           </Card>
         </>
       )}
+      {!isLoading && <AgentCard siteId={site.id} />}
     </div>
   );
 }
