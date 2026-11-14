@@ -5,6 +5,8 @@ Website activity tracking, analytics, SEO audits and AI growth suggestions. This
 - the tracking SDK, event ingestion and the analytics dashboard (spec M1–M2)
 - the SEO audit (M4)
 - AI suggestions and Ask AI (M5)
+- a per-site knowledge base: brand docs, content rules and Search Console exports from a local folder, used by the AI
+- an MCP server so a coding agent (Claude Code) working in the website's repo can fix SEO issues itself
 
 The full product spec is in [docs/spec.md](docs/spec.md).
 
@@ -17,6 +19,10 @@ website ──SDK──▶ POST /v1/events/batch ──▶ Postgres (raw events,
                  dashboard ◀── /v1/analytics/*, /v1/seo/*, /v1/suggestions, /v1/ai/* (api, X-Dev-Key)
                                                                    │
                                                      Claude (read-only tools, evidence-checked)
+
+local folder (docs, rules, GSC exports) ──worker: chunk + embed locally──▶ Postgres (pgvector) ──▶ AI context
+
+Claude Code in the website repo ──stdio──▶ services/mcp ──HTTP (X-Dev-Key)──▶ api
 ```
 
 | Package | What it is |
@@ -25,8 +31,10 @@ website ──SDK──▶ POST /v1/events/batch ──▶ Postgres (raw events,
 | [packages/shared-types](packages/shared-types) | zod schemas, API types, and URL/bot/device/channel helpers |
 | [packages/db](packages/db) | TypeORM migrations, the dedup insert, sessionisation and rollups, seeds |
 | [packages/seo](packages/seo) | SEO crawler (robots, sitemap, SSRF guard), HTML parsing, checks, scoring, PageSpeed client |
-| [services/api](services/api) | NestJS: ingestion, sites, analytics, SEO audits, AI (suggestions, Ask AI, drafts), `/health`, `/metrics`, `/sdk.js` |
-| [services/worker](services/worker) | NestJS standalone + BullMQ: processing, partitions, SEO audits, dead-letter queue |
+| [packages/knowledge](packages/knowledge) | Knowledge base: folder walking, Markdown chunking, local embeddings, content-rule and Search Console export parsing |
+| [services/api](services/api) | NestJS: ingestion, sites, analytics, SEO audits, AI (suggestions, Ask AI, drafts), knowledge base, coding-agent activity, `/health`, `/metrics`, `/sdk.js` |
+| [services/worker](services/worker) | NestJS standalone + BullMQ: processing, partitions, SEO audits, knowledge syncs, dead-letter queue |
+| [services/mcp](services/mcp) | MCP server (stdio) that gives a coding agent GrowthOS's findings, drafts, suggestions and knowledge |
 | [apps/dashboard](apps/dashboard) | React + Ant Design + Recharts dashboard |
 | [apps/demo-site](apps/demo-site) | Multi-page site (script-tag install) plus an `/app` SPA (npm install) |
 
@@ -37,8 +45,8 @@ website ──SDK──▶ POST /v1/events/batch ──▶ Postgres (raw events,
 ```bash
 cp .env.example .env          # then set DEV_KEY and VITE_DEV_KEY to the same long random value
 pnpm install
-pnpm infra:up                 # Postgres on :5433, Redis on :6379
-pnpm build
+pnpm infra:up                 # Postgres 16 + pgvector on :5433 (image built from docker/postgres), Redis on :6379
+pnpm build                    # also builds the MCP server (services/mcp/dist/main.js)
 pnpm db:migrate
 pnpm db:seed                  # dev organisation + "Demo site" (public id gos_demo_local)
 pnpm db:seed-demo             # optional: 4 weeks of synthetic traffic for the demo site
@@ -178,6 +186,12 @@ Every route except `POST /v1/events/batch`, `GET /health` and `GET /sdk.js` requ
 | `GET /v1/suggestions?site_id=` · `POST /v1/suggestions/generate` · `PATCH /v1/suggestions/:id` | AI growth suggestions: list, generate (runs in the background), and set status (`new`, `accepted`, `dismissed` or `done`) |
 | `POST /v1/ai/ask` · `GET /v1/ai/conversations?site_id=` · `GET /v1/ai/conversations/:id` | Ask AI (pass `conversation_id` to continue a conversation) |
 | `GET /v1/ai/status?site_id=` | Whether AI is configured, this month's spend against the budget, and Ask AI questions used today |
+| `GET` · `PUT` · `DELETE /v1/sites/:siteId/knowledge` | The site's knowledge source: status and counts, connect a folder (`{name, root_path}`), disconnect |
+| `POST /v1/sites/:siteId/knowledge/sync` | Re-read the folder in the background (only changed files are re-embedded) |
+| `GET /v1/sites/:siteId/knowledge/search?q=&limit=` | Hybrid search (meaning + exact terms) over the knowledge base |
+| `POST /v1/sites/:siteId/knowledge/check` | Content rules (banned words and claims) that `{text}` breaks |
+| `GET /v1/sites/:siteId/knowledge/gsc` | Search Console snapshot: top queries, near-page-1 opportunities, top pages, monthly trend |
+| `GET /v1/agent?site_id=` · `POST /v1/agent/activity` | Coding-agent setup command and recent activity; the MCP server reports each tool call |
 
 Analytics queries take `site_id`, `from` and `to` as **inclusive dates in the site timezone** (`YYYY-MM-DD`). The range is at most 400 days.
 
@@ -219,7 +233,7 @@ Open **SEO audit** in the dashboard and click **Run audit**. The worker crawls t
 - **Page explorer:** each crawled page's title, description, canonical, robots, heading outline, links, images and structured data, with a Google-style result preview.
 - **Re-audit:** run the audit again after applying fixes. The dashboard marks findings as new or resolved.
 
-Search Console (spec §7.2) is not connected yet.
+Search Console (spec §7.2) has no live API connection yet. Exports placed in the site's knowledge base are imported instead; see [Knowledge base](#knowledge-base).
 
 ## AI insights
 
@@ -239,10 +253,11 @@ AI runs behind a provider-agnostic `LlmProvider` interface (spec §8.4). Set one
   - **The safeguard:** the server checks every cited ID and value against the data, discards anything that doesn't match, and shows why. Links to reports are computed by the server, not taken from the model.
   - **Tracking:** mark suggestions `accepted`, `dismissed` or `done`. Once done, a before/after comparison of the chosen metric appears as data comes in.
 - **Ask AI:**
-  - **Tools:** the model answers through read-only tools (overview, top pages, landing pages, sources, events, devices, compare periods, SEO findings). These call the same services as the reports, so numbers match the dashboard.
+  - **Tools:** the model answers through read-only tools (overview, top pages, landing pages, sources, events, devices, compare periods, SEO findings, and, when the site has a knowledge base, knowledge search and Search Console). These call the same services as the reports, so numbers match the dashboard.
   - **Site scoping:** the site is fixed by the server, and the model can't choose or change it.
   - **Answer format:** answers state the date range, separate facts from hypotheses, say plainly when data isn't available (goals, revenue, rankings), and link to the relevant report.
-- **Draft fix with AI:** on title, meta description, heading, alt-text, structured-data and thin-content findings, Claude writes ready-to-paste copy from the page's crawled text. You apply it yourself; GrowthOS never writes to your site.
+- **Draft fix with AI:** on title, meta description, heading, alt-text, structured-data and thin-content findings, Claude writes ready-to-paste copy from the page's crawled text (and the site's brand and compliance knowledge, when connected). You apply it yourself; GrowthOS never writes to your site.
+- **Knowledge:** when a site has a knowledge base, suggestions get the most relevant passages (up to `KNOWLEDGE_CONTEXT_TOKENS`) and cite the ones they used. Passages are treated as reference material, never as instructions.
 - **Guard rails:**
   - **Budget:** a monthly spend cap per site (`AI_MONTHLY_BUDGET_USD`, default $20) and a daily Ask AI limit (`AI_ASK_DAILY_LIMIT`, default 50), both computed from logged token usage.
   - **Audit log:** every model call and tool call is recorded (`ai_calls`, `ai_tool_calls`). The log is kept even when a site's data is deleted.
@@ -259,6 +274,36 @@ AI runs behind a provider-agnostic `LlmProvider` interface (spec §8.4). Set one
 | One draft | about $0.01 |
 
 **Accuracy check (costs money):** `pnpm ai:eval [site-uuid]` asks about 30 questions whose answers come from the analytics API. It checks that the numbers appear in the answers, that missing data is admitted, and that a planted prompt injection is ignored. It prints the pass rate and the cost of the run.
+
+## Knowledge base
+
+Each site can be connected to one local folder, such as a growth or content-strategy repo. Open **Knowledge** in the dashboard, give the folder path, and click **Sync**.
+
+- **Allowed folders:** a path is accepted only if it's inside `KNOWLEDGE_ALLOWED_ROOTS` (separate several with `;`). Empty means the feature is off.
+- **What's read:**
+  - `.md`, `.mdx` and `.txt` files are chunked by heading and embedded **locally** (`Xenova/bge-small-en-v1.5`, about 34 MB, downloaded on first use to `EMBEDDING_CACHE_DIR`). No API key, no cost.
+  - `.mjs` rule files become content rules: banned words and claims, each with a pattern, severity and reason.
+  - `.json` files that look like Search Console exports (recognised by shape, e.g. `"source": "gsc"` with `keywords` or `pages`, or a list of `{month, clicks, impressions}`) are imported as queries, pages and a monthly trend.
+- **What's skipped:** `.git`, `node_modules`, build output, `secrets`, `state`, `src` and test folders, and files over 1.5 MB.
+- **Re-syncs** only re-embed files that changed. Rules and Search Console exports are re-imported whole.
+- **Search** is hybrid: pgvector similarity for meaning plus Postgres full text for exact terms, merged by rank.
+- **Where it shows up:** the home dashboard's **Google search** card, the Knowledge page, suggestions, Ask AI, drafts, and the MCP server.
+
+## Coding agent (MCP)
+
+[services/mcp](services/mcp) lets Claude Code, opened in a site's **website repo**, use what GrowthOS knows to fix issues itself: it lists findings, fetches drafts, searches the knowledge base, checks new copy against the content rules, and re-runs the audit after a deploy. The agent edits, commits and opens merge requests with your own git login. GrowthOS never writes to the repo.
+
+```bash
+pnpm --filter @growthos/mcp build            # already done by pnpm build
+cd <website repo>
+claude mcp add growthos --scope local -- node <growthOs>/services/mcp/dist/main.js
+```
+
+Use `--scope local` (or `user`), not `project`, so nothing is written into the client's repo. The **Knowledge** page shows the exact command for your checkout, whether an agent has been active, and its last 15 actions. The activity log stores a short summary per tool call, never the copy itself, and keeps 30 days.
+
+The server reads `DEV_KEY` and `API_PORT` from the root `.env`. `GROWTHOS_API_URL` and `GROWTHOS_SITE` (id, name or domain) override the API URL and default site. Tools and details are in [services/mcp/README.md](services/mcp/README.md).
+
+**Confidentiality:** knowledge passages and Search Console figures are internal. The server tells the agent to use them for decisions but never to paste them into code, comments, commits or merge-request descriptions.
 
 ## Privacy
 
@@ -305,9 +350,8 @@ Notes on the dashboard smoke test:
 
 - **From the spec:**
   - Goals and funnels (M3). AI suggestions use custom events as stand-ins for conversions until then.
-  - Search Console integration (M4)
+  - A live Search Console connection (M4). Only exports placed in the knowledge base are imported.
   - Auth (M6)
 - **SEO crawler:** it doesn't run JavaScript. Pages rendered by JavaScript are flagged, and their content checks are marked low-confidence; rendering them with Playwright is not built.
 - **Report filters:** the spec's channel, campaign, device and page-path filters aren't built. Reports filter by site, date range and comparison period only.
 - **Automatic retention:** only per-site deletion exists (`DELETE /v1/sites/:id/data`). Automatic retention (proposed: 13 months raw) is an open item in spec §16.
-# growth-engine
