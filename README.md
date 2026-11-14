@@ -38,6 +38,36 @@ Claude Code in the website repo ──stdio──▶ services/mcp ──HTTP (X-
 | [apps/dashboard](apps/dashboard) | React + Ant Design + Recharts dashboard |
 | [apps/demo-site](apps/demo-site) | Multi-page site (script-tag install) plus an `/app` SPA (npm install) |
 
+## Why GrowthOS
+
+Most website-growth work is spread across separate tools. An analytics tool shows *what* happened, an SEO crawler lists *what's wrong*, and an AI chat writes copy that knows nothing about either. Someone still has to connect the dots, write the fix, get it into the code, and check whether it worked. GrowthOS joins those steps into one loop.
+
+| Usually | In GrowthOS |
+|---|---|
+| Analytics, SEO audits and AI live in different products | One tool. Findings are ranked by **the page's real traffic** from your own analytics, so you fix the pages that matter first |
+| AI suggestions are generic and can invent numbers | Every number a suggestion cites is **checked against your data on the server**. Anything that doesn't match is discarded, and you're shown why |
+| AI copy ignores the brand's rules | Drafts and suggestions are grounded in the site's **own knowledge base**: brand facts, plans, demand research and compliance rules (banned words and claims) |
+| The audit stops at a report, and a developer fixes issues by hand | Through the **MCP server**, a coding agent in the website's repo picks up the findings, writes the fix, checks the copy against the rules, and commits it |
+| Nobody checks whether a change worked | **Re-audits** mark issues as new or resolved, and done suggestions show a **before/after** comparison of the chosen metric |
+| Analytics needs cookies and a consent trade-off | Cookieless until consent is granted. IP addresses and form values are never stored |
+| AI cost is open-ended | A monthly budget and a daily limit per site, every call logged, and local embeddings for the knowledge base at no cost |
+
+### How it drives growth
+
+```
+ measure ──▶ find ──▶ prioritise ──▶ fix ──▶ verify ──┐
+    ▲                                                 │
+    └─────────────────────────────────────────────────┘
+```
+
+1. **Measure:** the SDK records real visits, sources and conversions (custom events).
+2. **Find:** the SEO audit, Search Console exports and the AI turn that data into concrete issues and opportunities, such as queries sitting just outside page 1, landing pages that bounce, or missing titles on high-traffic pages.
+3. **Prioritise:** issues are ranked by severity, confidence, traffic and effort, so effort goes where the return is largest.
+4. **Fix:** this is where most tools stop and where the MCP server matters. A coding agent works through the findings in the repo, using drafts and the brand rules, so a fix that would wait in a backlog ships in the same session. More fixes shipped means more pages that rank and convert.
+5. **Verify:** after the deploy, the agent (or you) starts a re-audit, and the dashboard shows what was resolved and how the metric moved. That feeds the next round.
+
+The short version: GrowthOS doesn't only tell you what to improve. It gets the improvement into the code and shows whether it paid off.
+
 ## Local setup
 
 **Prerequisites:** Node 20.19+, pnpm 9 (`corepack enable`), and Docker Desktop running.
